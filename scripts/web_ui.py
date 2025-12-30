@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -123,6 +124,32 @@ HTML = """<!doctype html>
       color: var(--muted);
       font-family: var(--mono);
     }
+    .chart {
+      width: 100%;
+      height: 160px;
+      background: #fbfaf8;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .samples {
+      max-height: 180px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfaf8;
+      padding: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+    .heatmap {
+      width: 100%;
+      height: 240px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfaf8;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -185,6 +212,51 @@ HTML = """<!doctype html>
         <tbody></tbody>
       </table>
     </section>
+    <section class="grid">
+      <div class="panel">
+        <h2>Tokenizer Report</h2>
+        <div class="controls">
+          <button id="tokenReportBtn" class="primary">Refresh</button>
+        </div>
+        <div id="tokenReportMeta" class="meta"></div>
+        <table id="tokenReportTable">
+          <thead>
+            <tr><th>Token</th><th>ID</th><th>Count</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h2>Training Diagnostics</h2>
+        <div class="controls">
+          <button id="refreshLogs" class="primary">Refresh</button>
+        </div>
+        <div id="lossChart" class="chart"></div>
+        <div class="meta" id="lossMeta"></div>
+        <h2>Samples</h2>
+        <div id="sampleList" class="samples"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Introspection</h2>
+      <div class="controls">
+        <label>Layer <input id="inspectLayer" type="number" value="0" min="0" /></label>
+        <label>Head <input id="inspectHead" type="number" value="0" min="0" /></label>
+        <select id="inspectMode">
+          <option value="attention">Attention</option>
+          <option value="mlp">MLP (top activations)</option>
+        </select>
+        <button id="inspectBtn" class="primary">Inspect</button>
+      </div>
+      <div id="inspectMeta" class="meta"></div>
+      <canvas id="inspectHeatmap" class="heatmap"></canvas>
+      <table id="inspectTable">
+        <thead>
+          <tr><th>Index</th><th>Value</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
   </main>
 
   <script>
@@ -196,6 +268,14 @@ HTML = """<!doctype html>
     const checkpointSelect = document.getElementById('checkpointSelect');
     const checkpointMeta = document.getElementById('checkpointMeta');
     const runMeta = document.getElementById('runMeta');
+    const tokenReportMeta = document.getElementById('tokenReportMeta');
+    const tokenReportTable = document.getElementById('tokenReportTable').querySelector('tbody');
+    const lossChart = document.getElementById('lossChart');
+    const lossMeta = document.getElementById('lossMeta');
+    const sampleList = document.getElementById('sampleList');
+    const inspectMeta = document.getElementById('inspectMeta');
+    const inspectTable = document.getElementById('inspectTable').querySelector('tbody');
+    const inspectHeatmap = document.getElementById('inspectHeatmap');
 
     let state = { ids: [] };
 
@@ -222,6 +302,85 @@ HTML = """<!doctype html>
       });
     }
 
+    function renderLossChart(logs) {
+      lossChart.innerHTML = '';
+      if (!logs.length) {
+        lossChart.textContent = 'No logs yet.';
+        return;
+      }
+      const width = lossChart.clientWidth - 16;
+      const height = lossChart.clientHeight - 16;
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', width);
+      svg.setAttribute('height', height);
+      const losses = logs.filter((row) => row.train_loss != null);
+      const vals = logs.filter((row) => row.val_loss != null);
+      const all = losses.concat(vals);
+      const minLoss = Math.min(...all.map((row) => row.train_loss ?? row.val_loss));
+      const maxLoss = Math.max(...all.map((row) => row.train_loss ?? row.val_loss));
+      const minIter = Math.min(...logs.map((row) => row.iter));
+      const maxIter = Math.max(...logs.map((row) => row.iter));
+      function scaleX(iter) {
+        if (maxIter === minIter) return 0;
+        return ((iter - minIter) / (maxIter - minIter)) * width;
+      }
+      function scaleY(loss) {
+        if (maxLoss === minLoss) return height / 2;
+        return height - ((loss - minLoss) / (maxLoss - minLoss)) * height;
+      }
+      function drawLine(rows, color, key) {
+        if (!rows.length) return;
+        const path = rows
+          .map((row, idx) => {
+            const x = scaleX(row.iter);
+            const y = scaleY(row[key]);
+            return `${idx === 0 ? 'M' : 'L'}${x} ${y}`;
+          })
+          .join(' ');
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', path);
+        p.setAttribute('fill', 'none');
+        p.setAttribute('stroke', color);
+        p.setAttribute('stroke-width', '2');
+        svg.appendChild(p);
+      }
+      drawLine(losses, '#ff6b35', 'train_loss');
+      drawLine(vals, '#246eb9', 'val_loss');
+      lossChart.appendChild(svg);
+    }
+
+    function renderHeatmap(matrix) {
+      const ctx = inspectHeatmap.getContext('2d');
+      const width = inspectHeatmap.clientWidth;
+      const height = inspectHeatmap.clientHeight;
+      inspectHeatmap.width = width;
+      inspectHeatmap.height = height;
+      ctx.clearRect(0, 0, width, height);
+      if (!matrix || !matrix.length) {
+        ctx.fillStyle = '#6d6a65';
+        ctx.fillText('No attention data.', 10, 20);
+        return;
+      }
+      const rows = matrix.length;
+      const cols = matrix[0].length;
+      let min = Infinity;
+      let max = -Infinity;
+      matrix.forEach((row) => row.forEach((val) => {
+        min = Math.min(min, val);
+        max = Math.max(max, val);
+      }));
+      const cellW = width / cols;
+      const cellH = height / rows;
+      matrix.forEach((row, r) => {
+        row.forEach((val, c) => {
+          const norm = max === min ? 0.5 : (val - min) / (max - min);
+          const alpha = 0.15 + norm * 0.85;
+          ctx.fillStyle = `rgba(255, 107, 53, ${alpha})`;
+          ctx.fillRect(c * cellW, r * cellH, cellW, cellH);
+        });
+      });
+    }
+
     async function refreshCheckpoints() {
       const data = await api('/api/checkpoints');
       checkpointSelect.innerHTML = '';
@@ -233,6 +392,38 @@ HTML = """<!doctype html>
         checkpointSelect.appendChild(opt);
       });
       runMeta.textContent = data.run_dir;
+    }
+
+    async function refreshTokenizerReport() {
+      const data = await api('/api/tokenizer_report');
+      if (data.error) {
+        tokenReportMeta.textContent = data.error;
+        return;
+      }
+      tokenReportMeta.textContent = `tokens: ${data.total_tokens} unique: ${data.unique_tokens} vocab: ${data.vocab_size} coverage: ${(data.coverage * 100).toFixed(2)}% unk_rate: ${(data.unk_rate * 100).toFixed(2)}%`;
+      tokenReportTable.innerHTML = '';
+      data.top_tokens.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${row.token}</td><td>${row.id}</td><td>${row.count}</td>`;
+        tokenReportTable.appendChild(tr);
+      });
+    }
+
+    async function refreshTrainingLogs() {
+      const data = await api('/api/training_logs');
+      renderLossChart(data.logs || []);
+      if (data.logs && data.logs.length) {
+        const last = data.logs[data.logs.length - 1];
+        const trainPpl = last.train_ppl != null ? last.train_ppl.toFixed(2) : '-';
+        const valPpl = last.val_ppl != null ? last.val_ppl.toFixed(2) : '-';
+        lossMeta.textContent = `latest iter ${last.iter} train ${last.train_loss ?? '-'} val ${last.val_loss ?? '-'} ppl ${trainPpl}/${valPpl}`;
+      } else {
+        lossMeta.textContent = 'no logs found';
+      }
+      sampleList.textContent = '';
+      (data.samples || []).forEach((row) => {
+        sampleList.textContent += `[${row.iter}] ${row.sample}\n\n`;
+      });
     }
 
     document.getElementById('tokenizeBtn').addEventListener('click', async () => {
@@ -267,7 +458,33 @@ HTML = """<!doctype html>
       checkpointMeta.textContent = data.status;
     });
 
+    document.getElementById('tokenReportBtn').addEventListener('click', refreshTokenizerReport);
+    document.getElementById('refreshLogs').addEventListener('click', refreshTrainingLogs);
+
+    document.getElementById('inspectBtn').addEventListener('click', async () => {
+      if (!state.ids.length) return;
+      const layer = parseInt(document.getElementById('inspectLayer').value || '0', 10);
+      const head = parseInt(document.getElementById('inspectHead').value || '0', 10);
+      const mode = document.getElementById('inspectMode').value;
+      const data = await api('/api/inspect', { ids: state.ids, layer, head, mode, top_k: 10 });
+      inspectMeta.textContent = data.meta || '';
+      inspectTable.innerHTML = '';
+      if (mode === 'attention') {
+        renderHeatmap(data.attention);
+        inspectTable.innerHTML = '';
+      } else {
+        renderHeatmap(null);
+        (data.activations || []).forEach((row) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${row.index}</td><td>${row.value.toFixed(4)}</td>`;
+          inspectTable.appendChild(tr);
+        });
+      }
+    });
+
     refreshCheckpoints();
+    refreshTokenizerReport();
+    refreshTrainingLogs();
   </script>
 </body>
 </html>
@@ -293,6 +510,9 @@ class ServerState:
         self.run_dir = run_dir
         self.run_config = json.loads((run_dir / "run.json").read_text())
         self.tokenizer = load_tokenizer(run_dir / "tokenizer.json")
+        data_path = self.run_config.get("data_path")
+        self.data_path = Path(data_path) if data_path else None
+        self._tokenizer_report: dict | None = None
         device_name = device_override if device_override != "auto" else self.run_config.get("device", "auto")
         self.device = select_device(device_name)
         self.model = self._build_model()
@@ -319,6 +539,109 @@ class ServerState:
         if (self.run_dir / "latest.pt").exists():
             checkpoints.append("latest.pt")
         return checkpoints
+
+    def tokenizer_report(self, top_n: int = 25, max_chars: int = 200_000) -> dict:
+        if self._tokenizer_report is not None:
+            return self._tokenizer_report
+        if self.data_path is None or not self.data_path.exists():
+            return {"error": "data_path missing; rerun training with a dataset"}
+        text = self.data_path.read_text()
+        if len(text) > max_chars:
+            text = text[:max_chars]
+
+        ids = self.tokenizer.encode(text).ids
+        total_tokens = len(ids)
+        vocab_size = self.tokenizer.get_vocab_size()
+        unique_tokens = len(set(ids))
+        coverage = unique_tokens / max(1, vocab_size)
+
+        vocab = self.tokenizer.get_vocab()
+        unk_id = None
+        for token in ("<|unk|>", "<unk>", "[UNK]"):
+            if token in vocab:
+                unk_id = vocab[token]
+                break
+        unk_count = ids.count(unk_id) if unk_id is not None else 0
+        unk_rate = unk_count / max(1, total_tokens)
+
+        freq = Counter(ids)
+        top_tokens = []
+        for token_id, count in freq.most_common(top_n):
+            top_tokens.append(
+                {
+                    "id": token_id,
+                    "token": self.tokenizer.id_to_token(token_id),
+                    "count": count,
+                }
+            )
+        report = {
+            "total_tokens": total_tokens,
+            "unique_tokens": unique_tokens,
+            "vocab_size": vocab_size,
+            "coverage": coverage,
+            "unk_rate": unk_rate,
+            "top_tokens": top_tokens,
+        }
+        self._tokenizer_report = report
+        return report
+
+    def training_logs(self) -> dict:
+        logs_path = self.run_dir / "logs.jsonl"
+        samples_path = self.run_dir / "samples.jsonl"
+        logs = []
+        if logs_path.exists():
+            for line in logs_path.read_text().splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    logs.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        samples = []
+        if samples_path.exists():
+            for line in samples_path.read_text().splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    samples.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return {"logs": logs, "samples": samples}
+
+    def inspect(self, ids: list[int], layer: int, head: int, mode: str, top_k: int) -> dict:
+        if not ids:
+            return {"error": "no ids provided"}
+        max_len = min(len(ids), self.model.config.block_size, 64)
+        ids = ids[-max_len:]
+        idx = torch.tensor([ids], dtype=torch.long, device=self.device)
+        self.model.eval()
+        with torch.no_grad():
+            _, trace = self.model.forward_with_trace(idx)
+        tokens = [self.tokenizer.id_to_token(i) for i in ids]
+        if mode == "attention":
+            layer = max(0, min(layer, len(trace["attn"]) - 1))
+            attn = trace["attn"][layer]
+            head = max(0, min(head, attn.size(1) - 1))
+            matrix = attn[0, head].tolist()
+            return {
+                "attention": matrix,
+                "tokens": tokens,
+                "meta": f"layer {layer} head {head} tokens {len(tokens)}",
+            }
+        if mode == "mlp":
+            layer = max(0, min(layer, len(trace["mlp"]) - 1))
+            mlp = trace["mlp"][layer][0, -1]
+            values, indices = torch.topk(mlp, k=min(top_k, mlp.numel()))
+            activations = [
+                {"index": int(idx.item()), "value": float(val.item())}
+                for idx, val in zip(indices, values)
+            ]
+            return {
+                "activations": activations,
+                "tokens": tokens,
+                "meta": f"layer {layer} token {len(tokens) - 1}",
+            }
+        return {"error": f"unknown mode: {mode}"}
 
     def load_checkpoint(self, checkpoint: str | None) -> None:
         if checkpoint is None:
@@ -424,6 +747,25 @@ class Handler(BaseHTTPRequestHandler):
                 ckpt = payload.get("checkpoint")
                 STATE.load_checkpoint(ckpt)
                 self._send_json({"status": f"loaded {STATE.current_checkpoint}"})
+                return
+            if self.path == "/api/tokenizer_report":
+                payload = self._read_json()
+                top_n = int(payload.get("top_n", 25))
+                report = STATE.tokenizer_report(top_n=top_n)
+                self._send_json(report)
+                return
+            if self.path == "/api/training_logs":
+                self._send_json(STATE.training_logs())
+                return
+            if self.path == "/api/inspect":
+                payload = self._read_json()
+                ids = payload.get("ids", [])
+                layer = int(payload.get("layer", 0))
+                head = int(payload.get("head", 0))
+                mode = payload.get("mode", "attention")
+                top_k = int(payload.get("top_k", 10))
+                result = STATE.inspect(ids, layer, head, mode, top_k)
+                self._send_json(result)
                 return
             self._send_json({"error": "unknown endpoint"}, status=404)
         except Exception as exc:

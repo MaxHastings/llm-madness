@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from llm_madness.tokenizer import train_bpe_tokenizer
-from llm_madness.utils import ensure_dir, find_latest_run, timestamp, write_json
+from llm_madness.utils import ensure_dir, find_latest_run, git_sha, timestamp, write_json
 
 
 def load_config(path: Path) -> dict:
@@ -42,7 +42,16 @@ def main() -> None:
         byte_level=bool(config.get("byte_level", True)),
     )
 
-    write_json(run_dir / "run.json", {"config": config, "report": report})
+    git_commit = git_sha(Path(__file__).resolve().parents[1])
+    write_json(
+        run_dir / "run.json",
+        {
+            "config": config,
+            "report": report,
+            "git_sha": git_commit,
+        },
+    )
+    write_json(run_dir / "tokenizer_config.json", config)
     print(f"saved tokenizer to {output_path}")
 
 

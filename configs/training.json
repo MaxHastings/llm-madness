@@ -19,6 +19,10 @@
     "val_split": 0.1,
     "save_interval": 500,
     "grad_clip": 1.0,
-    "warmup_iters": 200
+    "warmup_iters": 200,
+    "sample_prompt": "1 + 1 =",
+    "sample_length": 32,
+    "sample_temperature": 1.0,
+    "sample_top_k": null
   }
 }

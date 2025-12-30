@@ -51,6 +51,23 @@ class CausalSelfAttention(nn.Module):
         y = self.resid_drop(self.proj(y))
         return y
 
+    def forward_with_attn(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        b, t, c = x.size()
+        qkv = self.qkv(x)
+        q, k, v = qkv.split(c, dim=2)
+        q = q.view(b, t, self.n_head, self.head_dim).transpose(1, 2)
+        k = k.view(b, t, self.n_head, self.head_dim).transpose(1, 2)
+        v = v.view(b, t, self.n_head, self.head_dim).transpose(1, 2)
+
+        att = (q @ k.transpose(-2, -1)) * self.scale
+        att = att.masked_fill(self.mask[:, :, :t, :t] == 0, float("-inf"))
+        att = F.softmax(att, dim=-1)
+        att_drop = self.attn_drop(att)
+        y = att_drop @ v
+        y = y.transpose(1, 2).contiguous().view(b, t, c)
+        y = self.resid_drop(self.proj(y))
+        return y, att
+
 
 class MLP(nn.Module):
     def __init__(self, config: GPTConfig) -> None:
@@ -78,6 +95,13 @@ class Block(nn.Module):
         x = x + self.attn(self.ln1(x))
         x = x + self.mlp(self.ln2(x))
         return x
+
+    def forward_with_trace(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        attn_out, attn = self.attn.forward_with_attn(self.ln1(x))
+        x = x + attn_out
+        mlp_out = self.mlp(self.ln2(x))
+        x = x + mlp_out
+        return x, attn, mlp_out
 
 
 class GPT(nn.Module):
@@ -118,6 +142,26 @@ class GPT(nn.Module):
         if targets is not None:
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
         return logits, loss
+
+    def forward_with_trace(self, idx: torch.Tensor):
+        b, t = idx.size()
+        if t > self.config.block_size:
+            raise ValueError("sequence length exceeds block size")
+
+        pos = torch.arange(0, t, device=idx.device)
+        x = self.tok_emb(idx) + self.pos_emb(pos)
+        x = self.drop(x)
+
+        attn_maps: list[torch.Tensor] = []
+        mlp_outputs: list[torch.Tensor] = []
+        for block in self.blocks:
+            x, attn, mlp_out = block.forward_with_trace(x)
+            attn_maps.append(attn)
+            mlp_outputs.append(mlp_out)
+
+        x = self.ln_f(x)
+        logits = self.head(x)
+        return logits, {"attn": attn_maps, "mlp": mlp_outputs}
 
     @torch.no_grad()
     def generate(

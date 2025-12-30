@@ -12,7 +12,7 @@ import torch
 from llm_madness.data import encode_text, get_batch, split_text_by_lines
 from llm_madness.model import GPT, GPTConfig
 from llm_madness.tokenizer import load_tokenizer
-from llm_madness.utils import ensure_dir, find_latest_run, sha256_text, timestamp, write_json
+from llm_madness.utils import ensure_dir, find_latest_run, git_sha, sha256_text, timestamp, write_json
 
 
 def load_config(path: Path) -> dict:
@@ -46,6 +46,24 @@ def estimate_loss(
             losses.append(loss.item())
     model.train()
     return sum(losses) / max(1, len(losses))
+
+
+def generate_sample(
+    model: GPT,
+    tokenizer,
+    prompt: str,
+    max_new_tokens: int,
+    temperature: float,
+    top_k: int | None,
+    device: torch.device,
+) -> str:
+    model.eval()
+    with torch.no_grad():
+        ids = tokenizer.encode(prompt).ids
+        idx = torch.tensor([ids], dtype=torch.long, device=device)
+        out = model.generate(idx, max_new_tokens, temperature=temperature, top_k=top_k)
+    model.train()
+    return tokenizer.decode(out[0].tolist())
 
 
 def main() -> None:
@@ -102,6 +120,18 @@ def main() -> None:
     )
     model = GPT(gpt_config).to(device)
 
+    if train_tokens.numel() < 2:
+        raise SystemExit("training data is too small; need at least 2 tokens")
+    train_block_size = min(gpt_config.block_size, train_tokens.numel() - 1)
+
+    val_block_size: int | None = None
+    if val_tokens is not None:
+        if val_tokens.numel() < 2:
+            print("warning: validation split too small; skipping validation")
+            val_tokens = None
+        else:
+            val_block_size = min(gpt_config.block_size, val_tokens.numel() - 1)
+
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=float(train_cfg.get("learning_rate", 3e-4)),
@@ -116,6 +146,11 @@ def main() -> None:
     save_interval = int(train_cfg.get("save_interval", 500))
     grad_clip = float(train_cfg.get("grad_clip", 1.0))
     warmup_iters = int(train_cfg.get("warmup_iters", 200))
+    sample_prompt = str(train_cfg.get("sample_prompt", "1 + 1 ="))
+    sample_length = int(train_cfg.get("sample_length", 32))
+    sample_temperature = float(train_cfg.get("sample_temperature", 1.0))
+    sample_top_k = train_cfg.get("sample_top_k", None)
+    sample_top_k = int(sample_top_k) if sample_top_k is not None else None
 
     def get_lr(iter_num: int) -> float:
         base_lr = float(train_cfg.get("learning_rate", 3e-4))
@@ -130,9 +165,11 @@ def main() -> None:
         "data_sha256": sha256_text(text),
         "tokenizer_path": str(tokenizer_path),
         "device": str(device),
+        "git_sha": git_sha(Path(__file__).resolve().parents[1]),
     }
     write_json(run_dir / "run.json", run_info)
     (run_dir / "tokenizer.json").write_text(tokenizer_path.read_text())
+    (run_dir / "training_config.json").write_text(args.config.read_text())
 
     log_path = run_dir / "logs.jsonl"
     for iter_num in range(1, max_iters + 1):
@@ -140,7 +177,7 @@ def main() -> None:
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
-        xb, yb = get_batch(train_tokens, gpt_config.block_size, batch_size, device)
+        xb, yb = get_batch(train_tokens, train_block_size, batch_size, device)
         _, loss = model(xb, yb)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -148,26 +185,31 @@ def main() -> None:
         optimizer.step()
 
         if iter_num % log_interval == 0:
+            train_ppl = math.exp(loss.item())
             log_entry = {
                 "iter": iter_num,
                 "train_loss": float(loss.item()),
+                "train_ppl": float(train_ppl),
                 "lr": lr,
             }
             with log_path.open("a") as log_file:
                 log_file.write(json.dumps(log_entry) + "\n")
             print(f"iter {iter_num} train loss {loss.item():.4f} lr {lr:.6f}")
 
-        if val_tokens is not None and iter_num % eval_interval == 0:
+        if val_tokens is not None and val_block_size is not None and iter_num % eval_interval == 0:
             val_loss = estimate_loss(
                 model,
                 val_tokens,
-                gpt_config.block_size,
+                val_block_size,
                 batch_size,
                 eval_iters,
                 device,
             )
+            val_ppl = math.exp(val_loss)
             with log_path.open("a") as log_file:
-                log_file.write(json.dumps({"iter": iter_num, "val_loss": val_loss}) + "\n")
+                log_file.write(
+                    json.dumps({"iter": iter_num, "val_loss": val_loss, "val_ppl": val_ppl}) + "\n"
+                )
             print(f"iter {iter_num} val loss {val_loss:.4f}")
 
         if iter_num % save_interval == 0 or iter_num == max_iters:
@@ -180,6 +222,24 @@ def main() -> None:
             ckpt_path = run_dir / "checkpoints" / f"checkpoint_{iter_num:07d}.pt"
             torch.save(ckpt, ckpt_path)
             torch.save(ckpt, run_dir / "latest.pt")
+
+            sample_text = generate_sample(
+                model,
+                tokenizer,
+                sample_prompt,
+                sample_length,
+                sample_temperature,
+                sample_top_k,
+                device,
+            )
+            sample_entry = {
+                "iter": iter_num,
+                "checkpoint": ckpt_path.name,
+                "prompt": sample_prompt,
+                "sample": sample_text,
+            }
+            with (run_dir / "samples.jsonl").open("a") as sample_file:
+                sample_file.write(json.dumps(sample_entry) + "\n")
 
     print(f"training complete. run saved to {run_dir}")
 
