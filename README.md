@@ -23,7 +23,7 @@ A lightweight, end-to-end text LLM pipeline with clear stages and timestamped ru
 
 ```bash
 # 1) generate arithmetic data
-python -m scripts.data_generate --output-dir data/generated --count 200 --min-value 0 --max-value 20
+python -m scripts.data_generate --output-dir data/generated --count 10000 --min-value 0 --max-value 99
 
 # 2) combine into a single dataset
 python -m scripts.data_combine --inputs data/generated --output-dir data/combined --shuffle

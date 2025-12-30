@@ -163,6 +163,24 @@ class GPT(nn.Module):
         logits = self.head(x)
         return logits, {"attn": attn_maps, "mlp": mlp_outputs}
 
+    def forward_with_hidden_states(self, idx: torch.Tensor):
+        b, t = idx.size()
+        if t > self.config.block_size:
+            raise ValueError("sequence length exceeds block size")
+
+        pos = torch.arange(0, t, device=idx.device)
+        x = self.tok_emb(idx) + self.pos_emb(pos)
+        x = self.drop(x)
+
+        hidden_states: list[torch.Tensor] = []
+        for block in self.blocks:
+            x = block(x)
+            hidden_states.append(x)
+
+        x = self.ln_f(x)
+        logits = self.head(x)
+        return logits, hidden_states
+
     @torch.no_grad()
     def generate(
         self,

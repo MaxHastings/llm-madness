@@ -16,6 +16,8 @@ const inspectLegend = document.getElementById('inspectLegend');
 const inspectTable = document.getElementById('inspectTable').querySelector('tbody');
 const inspectHeatmap = document.getElementById('inspectHeatmap');
 const inspectTokens = document.getElementById('inspectTokens');
+const layerTopkWrap = document.getElementById('layerTopkWrap');
+const layerTopkTable = document.getElementById('layerTopkTable').querySelector('tbody');
 
 const state = { ids: [], tokens: [] };
 
@@ -51,6 +53,27 @@ function renderInspectTokens(tokens) {
     el.textContent = `${i}:${tok}`;
     el.title = `index ${i}`;
     inspectTokens.appendChild(el);
+  });
+}
+
+function renderLayerTopk(layers) {
+  layerTopkTable.innerHTML = '';
+  layers.forEach((layer) => {
+    const tr = document.createElement('tr');
+    const layerTd = document.createElement('td');
+    layerTd.textContent = `${layer.layer}`;
+    const tokensTd = document.createElement('td');
+    layer.topk.forEach((row) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'token-btn';
+      btn.textContent = `${row.token} (${row.prob.toFixed(3)})`;
+      btn.addEventListener('click', () => appendToken(row.id));
+      tokensTd.appendChild(btn);
+    });
+    tr.appendChild(layerTd);
+    tr.appendChild(tokensTd);
+    layerTopkTable.appendChild(tr);
   });
 }
 
@@ -373,15 +396,28 @@ document.getElementById('inspectBtn').addEventListener('click', async () => {
     const maxVal = data.max_val != null ? data.max_val.toFixed(4) : '-';
     inspectLegend.textContent = `rows=query tokens, cols=key tokens | min ${minVal} max ${maxVal}`;
     inspectTable.innerHTML = '';
+    layerTopkWrap.style.display = 'none';
+    inspectTable.style.display = 'table';
   } else {
-    renderHeatmap(null);
-    inspectLegend.textContent = 'top activations for last token';
-    inspectTable.innerHTML = '';
-    (data.activations || []).forEach((row) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${row.index}</td><td>${row.value.toFixed(4)}</td>`;
-      inspectTable.appendChild(tr);
-    });
+    if (mode === 'mlp') {
+      renderHeatmap(null);
+      inspectLegend.textContent = 'top activations for last token';
+      inspectTable.innerHTML = '';
+      layerTopkWrap.style.display = 'none';
+      inspectTable.style.display = 'table';
+      (data.activations || []).forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${row.index}</td><td>${row.value.toFixed(4)}</td>`;
+        inspectTable.appendChild(tr);
+      });
+    } else if (mode === 'layer_topk') {
+      renderHeatmap(null);
+      inspectLegend.textContent = 'layer-wise next-token probabilities (last token only)';
+      inspectTable.innerHTML = '';
+      inspectTable.style.display = 'none';
+      layerTopkWrap.style.display = 'block';
+      renderLayerTopk(data.layers || []);
+    }
   }
 });
 

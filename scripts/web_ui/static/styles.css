@@ -182,6 +182,33 @@ button.token-btn:hover {
   gap: 16px;
 }
 
+#layerTopkWrap {
+  display: none;
+  margin-top: 12px;
+}
+
+#layerTopkTable td {
+  vertical-align: top;
+}
+
+.token-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 4px 2px 0;
+  padding: 4px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fdf5ee;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.token-pill strong {
+  font-weight: 600;
+  color: var(--accent-2);
+}
+
 @media (max-width: 920px) {
   header {
     flex-direction: column;

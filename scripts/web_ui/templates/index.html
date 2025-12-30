@@ -90,6 +90,7 @@
         <select id="inspectMode">
           <option value="attention">Attention</option>
           <option value="mlp">MLP (top activations)</option>
+          <option value="layer_topk">Layer Top-K</option>
         </select>
         <button id="inspectBtn" class="primary">Inspect</button>
       </div>
@@ -102,6 +103,15 @@
         <div>
           <h3>Tokens</h3>
           <div id="inspectTokens" class="token-list"></div>
+          <div id="layerTopkWrap">
+            <h3>Layer Top-K</h3>
+            <table id="layerTopkTable">
+              <thead>
+                <tr><th>Layer</th><th>Top-K tokens</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
           <table id="inspectTable">
             <thead>
               <tr><th>Index</th><th>Value</th></tr>

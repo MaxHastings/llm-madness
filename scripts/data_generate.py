@@ -44,10 +44,10 @@ def generate_lines(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate arithmetic addition/subtraction data.")
     parser.add_argument("--output-dir", type=Path, default=Path("data/generated"))
-    parser.add_argument("--count", type=int, default=200)
+    parser.add_argument("--count", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--min-value", type=int, default=0)
-    parser.add_argument("--max-value", type=int, default=20)
+    parser.add_argument("--max-value", type=int, default=99)
     parser.add_argument("--addition", action="store_true", help="include addition problems")
     parser.add_argument("--subtraction", action="store_true", help="include subtraction problems")
     parser.add_argument("--allow-negative", action="store_true", help="allow negative subtraction results")

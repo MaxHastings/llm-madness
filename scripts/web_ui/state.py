@@ -125,10 +125,10 @@ class ServerState:
         ids = ids[-max_len:]
         idx = torch.tensor([ids], dtype=torch.long, device=self.device)
         self.model.eval()
-        with torch.no_grad():
-            _, trace = self.model.forward_with_trace(idx)
         tokens = [self.tokenizer.id_to_token(i) for i in ids]
         if mode == "attention":
+            with torch.no_grad():
+                _, trace = self.model.forward_with_trace(idx)
             layer_idx, head_idx, matrix, min_val, max_val = attention_from_trace(trace, layer, head)
             return {
                 "attention": matrix,
@@ -138,12 +138,35 @@ class ServerState:
                 "max_val": max_val,
             }
         if mode == "mlp":
+            with torch.no_grad():
+                _, trace = self.model.forward_with_trace(idx)
             layer_idx, activations = mlp_from_trace(trace, layer, top_k)
             return {
                 "activations": activations,
                 "tokens": tokens,
                 "meta": f"layer {layer_idx} token {len(tokens) - 1}",
             }
+        if mode == "layer_topk":
+            with torch.no_grad():
+                _, hidden_states = self.model.forward_with_hidden_states(idx)
+            results = []
+            for layer_idx, hidden in enumerate(hidden_states):
+                layer_hidden = self.model.ln_f(hidden)
+                logits = self.model.head(layer_hidden)[:, -1, :]
+                probs = torch.softmax(logits, dim=-1)
+                values, indices = torch.topk(probs, k=min(top_k, probs.size(-1)))
+                topk = []
+                for prob, token_id in zip(values[0], indices[0]):
+                    tid = int(token_id.item())
+                    topk.append(
+                        {
+                            "id": tid,
+                            "token": self.tokenizer.id_to_token(tid),
+                            "prob": float(prob.item()),
+                        }
+                    )
+                results.append({"layer": layer_idx, "topk": topk})
+            return {"layers": results, "tokens": tokens, "meta": f"layers {len(results)}"}
         return {"error": f"unknown mode: {mode}"}
 
     def load_checkpoint(self, checkpoint: str | None) -> None:
