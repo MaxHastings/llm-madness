@@ -10,7 +10,7 @@
   "training": {
     "device": "auto",
     "batch_size": 32,
-    "max_iters": 2000,
+    "max_iters": 3000,
     "learning_rate": 0.0003,
     "weight_decay": 0.1,
     "log_interval": 50,

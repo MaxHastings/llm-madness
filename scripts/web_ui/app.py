@@ -19,6 +19,8 @@ STATIC_DIR = BASE_DIR / "static"
 
 
 STATE: ServerState | None = None
+DEVICE_OVERRIDE = "auto"
+RUNS_DIR = Path("runs/train")
 
 
 def guess_mime(path: Path) -> str:
@@ -90,6 +92,15 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"error": "server not ready"}, status=500)
             return
         try:
+            if self.path == "/api/runs":
+                runs = []
+                if RUNS_DIR.exists():
+                    for entry in sorted(RUNS_DIR.iterdir()):
+                        if entry.is_dir():
+                            runs.append(str(entry))
+                current = str(STATE.run_dir) if STATE else None
+                self._send_json({"runs": runs, "current": current})
+                return
             if self.path == "/api/tokenize":
                 payload = self._read_json()
                 text = payload.get("text", "")
@@ -151,6 +162,20 @@ class Handler(BaseHTTPRequestHandler):
                 STATE.load_checkpoint(ckpt)
                 self._send_json({"status": f"loaded {STATE.current_checkpoint}"})
                 return
+            if self.path == "/api/load_run":
+                payload = self._read_json()
+                run_dir = payload.get("run_dir", "")
+                run_path = Path(run_dir)
+                if not run_path.exists() or not run_path.is_dir():
+                    self._send_json({"error": "run dir not found"}, status=404)
+                    return
+                resolved = run_path.resolve()
+                if RUNS_DIR.resolve() not in resolved.parents:
+                    self._send_json({"error": "invalid run dir"}, status=400)
+                    return
+                STATE = ServerState(resolved, None, DEVICE_OVERRIDE)
+                self._send_json({"status": f"loaded {STATE.run_dir}", "run_dir": str(STATE.run_dir)})
+                return
             if self.path == "/api/tokenizer_report":
                 payload = self._read_json()
                 top_n = int(payload.get("top_n", 25))
@@ -192,7 +217,9 @@ def main() -> None:
         run_dir = latest
 
     global STATE
-    STATE = ServerState(run_dir, args.checkpoint, args.device)
+    global DEVICE_OVERRIDE
+    DEVICE_OVERRIDE = args.device
+    STATE = ServerState(run_dir, args.checkpoint, DEVICE_OVERRIDE)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"server running on http://{args.host}:{args.port}")
     server.serve_forever()

@@ -6,6 +6,8 @@ const nextTableBody = document.getElementById('nextTable').querySelector('tbody'
 const checkpointSelect = document.getElementById('checkpointSelect');
 const checkpointMeta = document.getElementById('checkpointMeta');
 const runMeta = document.getElementById('runMeta');
+const runSelect = document.getElementById('runSelect');
+const runStatus = document.getElementById('runStatus');
 const tokenReportMeta = document.getElementById('tokenReportMeta');
 const tokenReportTable = document.getElementById('tokenReportTable').querySelector('tbody');
 const lossChart = document.getElementById('lossChart');
@@ -287,6 +289,18 @@ async function refreshCheckpoints() {
   runMeta.textContent = data.run_dir;
 }
 
+async function refreshRuns() {
+  const data = await api('/api/runs');
+  runSelect.innerHTML = '';
+  data.runs.forEach((run) => {
+    const opt = document.createElement('option');
+    opt.value = run;
+    opt.textContent = run;
+    if (run === data.current) opt.selected = true;
+    runSelect.appendChild(opt);
+  });
+}
+
 async function refreshTokenizerReport() {
   const data = await api('/api/tokenizer_report');
   if (data.error) {
@@ -378,6 +392,20 @@ document.getElementById('loadCheckpoint').addEventListener('click', async () => 
   checkpointMeta.textContent = data.status;
 });
 
+document.getElementById('loadRun').addEventListener('click', async () => {
+  const picked = runSelect.value;
+  const data = await api('/api/load_run', { run_dir: picked });
+  runStatus.textContent = data.status;
+  state.ids = [];
+  state.tokens = [];
+  renderTokens([], []);
+  promptMeta.textContent = 'no tokens';
+  runMeta.textContent = data.run_dir || runMeta.textContent;
+  await refreshCheckpoints();
+  await refreshTokenizerReport();
+  await refreshTrainingLogs();
+});
+
 document.getElementById('tokenReportBtn').addEventListener('click', refreshTokenizerReport);
 document.getElementById('refreshLogs').addEventListener('click', refreshTrainingLogs);
 
@@ -422,5 +450,6 @@ document.getElementById('inspectBtn').addEventListener('click', async () => {
 });
 
 refreshCheckpoints();
+refreshRuns();
 refreshTokenizerReport();
 refreshTrainingLogs();

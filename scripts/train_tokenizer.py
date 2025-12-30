@@ -40,6 +40,7 @@ def main() -> None:
         discover_regex=config.get("discover_special_token_regex"),
         add_prefix_space=bool(config.get("add_prefix_space", False)),
         byte_level=bool(config.get("byte_level", True)),
+        split_digits=bool(config.get("split_digits", False)),
     )
 
     git_commit = git_sha(Path(__file__).resolve().parents[1])

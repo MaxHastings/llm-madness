@@ -6,7 +6,7 @@ from typing import Iterable
 
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
-from tokenizers.pre_tokenizers import ByteLevel
+from tokenizers.pre_tokenizers import ByteLevel, Digits, Sequence
 from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from tokenizers.trainers import BpeTrainer
 
@@ -29,6 +29,7 @@ def train_bpe_tokenizer(
     discover_regex: str | None = None,
     add_prefix_space: bool = False,
     byte_level: bool = True,
+    split_digits: bool = False,
 ) -> dict:
     input_path = Path(input_path)
     text = input_path.read_text()
@@ -43,8 +44,15 @@ def train_bpe_tokenizer(
             special_tokens.append(token)
 
     tokenizer = Tokenizer(BPE(unk_token=special_tokens[0] if special_tokens else "<|unk|>"))
+    pre_tokenizers = []
+    if split_digits:
+        pre_tokenizers.append(Digits(individual_digits=True))
     if byte_level:
-        tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=add_prefix_space)
+        pre_tokenizers.append(ByteLevel(add_prefix_space=add_prefix_space))
+
+    if pre_tokenizers:
+        tokenizer.pre_tokenizer = pre_tokenizers[0] if len(pre_tokenizers) == 1 else Sequence(pre_tokenizers)
+    if byte_level:
         tokenizer.decoder = ByteLevelDecoder()
 
     trainer = BpeTrainer(
@@ -62,5 +70,6 @@ def train_bpe_tokenizer(
         "special_tokens": special_tokens,
         "discover_regex": discover_regex,
         "discovered_tokens": discovered,
+        "split_digits": split_digits,
         "output_path": str(output_path),
     }

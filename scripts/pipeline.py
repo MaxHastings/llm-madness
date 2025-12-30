@@ -29,7 +29,7 @@ def main() -> None:
     parser.add_argument("--skip-train", action="store_true", help="skip model training")
 
     parser.add_argument("--generate-output-dir", type=Path, default=Path("data/generated"))
-    parser.add_argument("--generate-count", type=int, default=10000)
+    parser.add_argument("--generate-count", type=int, default=200000)
     parser.add_argument("--generate-seed", type=int, default=1234)
     parser.add_argument("--generate-min-value", type=int, default=0)
     parser.add_argument("--generate-max-value", type=int, default=99)

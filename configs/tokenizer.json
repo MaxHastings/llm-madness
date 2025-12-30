@@ -9,5 +9,6 @@
   ],
   "discover_special_token_regex": "<\\|speaker=[^|]+\\|>",
   "add_prefix_space": false,
-  "byte_level": true
+  "byte_level": true,
+  "split_digits": true
 }

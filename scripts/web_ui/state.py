@@ -171,13 +171,21 @@ class ServerState:
 
     def load_checkpoint(self, checkpoint: str | None) -> None:
         if checkpoint is None:
-            checkpoint = "latest.pt"
-        if checkpoint == "latest.pt":
-            ckpt_path = self.run_dir / "latest.pt"
+            latest_path = self.run_dir / "latest.pt"
+            if latest_path.exists():
+                ckpt_path = latest_path
+            else:
+                candidates = sorted((self.run_dir / "checkpoints").glob("checkpoint_*.pt"))
+                if not candidates:
+                    raise FileNotFoundError("no checkpoints found for run")
+                ckpt_path = candidates[-1]
         else:
-            ckpt_path = self.run_dir / "checkpoints" / checkpoint
-        if not ckpt_path.exists():
-            raise FileNotFoundError(f"checkpoint not found: {ckpt_path}")
+            if checkpoint == "latest.pt":
+                ckpt_path = self.run_dir / "latest.pt"
+            else:
+                ckpt_path = self.run_dir / "checkpoints" / checkpoint
+            if not ckpt_path.exists():
+                raise FileNotFoundError(f"checkpoint not found: {ckpt_path}")
         payload = torch.load(ckpt_path, map_location=self.device)
         self.model.load_state_dict(payload["model_state"])
         self.model.eval()
