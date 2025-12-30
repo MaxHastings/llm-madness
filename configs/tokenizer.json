@@ -1,0 +1,13 @@
+{
+  "vocab_size": 4096,
+  "min_frequency": 2,
+  "special_tokens": [
+    "<|unk|>",
+    "<|begin|>",
+    "<|end|>",
+    "<|endoftext|>"
+  ],
+  "discover_special_token_regex": "<\\|speaker=[^|]+\\|>",
+  "add_prefix_space": false,
+  "byte_level": true
+}

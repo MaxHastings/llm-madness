@@ -1,0 +1,31 @@
+# data + runs
+/data/**
+!/data/.gitkeep
+!/data/**/.gitkeep
+/runs/**
+!/runs/.gitkeep
+!/runs/**/.gitkeep
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# environments
+.venv/
+venv/
+.env
+
+# build/output
+build/
+dist/
+.ipynb_checkpoints/
+
+# artifacts
+*.pt
+*.bin
+*.ckpt
+*.log
+
+# misc
+.DS_Store

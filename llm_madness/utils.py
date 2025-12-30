@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Iterable
+
+
+def timestamp() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def ensure_dir(path: Path | str) -> Path:
+    path = Path(path)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def read_text(path: Path | str) -> str:
+    return Path(path).read_text()
+
+
+def write_text(path: Path | str, text: str) -> None:
+    Path(path).write_text(text)
+
+
+def write_json(path: Path | str, data: dict) -> None:
+    Path(path).write_text(json.dumps(data, indent=2, sort_keys=True))
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def list_text_files(paths: Iterable[Path]) -> list[Path]:
+    results: list[Path] = []
+    for path in paths:
+        if path.is_dir():
+            results.extend(sorted(path.rglob("*.txt")))
+        elif path.is_file():
+            results.append(path)
+    return results
+
+
+def find_latest_run(base_dir: Path, filename: str | None = None) -> Path | None:
+    if not base_dir.exists():
+        return None
+    candidates = [p for p in base_dir.iterdir() if p.is_dir()]
+    if not candidates:
+        return None
+    latest = sorted(candidates, key=lambda p: p.name)[-1]
+    if filename:
+        candidate_file = latest / filename
+        if candidate_file.exists():
+            return candidate_file
+    return latest

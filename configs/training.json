@@ -1,0 +1,24 @@
+{
+  "seed": 1337,
+  "model": {
+    "block_size": 128,
+    "n_layer": 4,
+    "n_head": 4,
+    "n_embd": 256,
+    "dropout": 0.1
+  },
+  "training": {
+    "device": "auto",
+    "batch_size": 32,
+    "max_iters": 2000,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.1,
+    "log_interval": 50,
+    "eval_interval": 200,
+    "eval_iters": 50,
+    "val_split": 0.1,
+    "save_interval": 500,
+    "grad_clip": 1.0,
+    "warmup_iters": 200
+  }
+}
