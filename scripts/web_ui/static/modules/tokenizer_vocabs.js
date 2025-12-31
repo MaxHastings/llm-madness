@@ -18,6 +18,23 @@ function formatBytes(bytes) {
   return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
 }
 
+function formatDatasetLabel(path) {
+  if (!path) return 'dataset -';
+  const parts = path.split('/').filter(Boolean);
+  const idx = parts.lastIndexOf('datasets');
+  if (idx !== -1 && parts[idx + 1]) {
+    return `dataset ${parts[idx + 1]}`;
+  }
+  const file = parts[parts.length - 1] || path;
+  return `dataset ${file}`;
+}
+
+function formatRunLabel(runDir) {
+  if (!runDir) return 'run -';
+  const parts = runDir.split('/').filter(Boolean);
+  return `run ${parts[parts.length - 1] || runDir}`;
+}
+
 let logStream = null;
 
 function setVocabDetails(payload, label) {
@@ -65,7 +82,9 @@ async function viewVocab(runDir) {
       config: data.config,
       report: data.report,
     };
-    setVocabDetails(payload, `loaded ${runDir}`);
+    const datasetManifest = data?.manifest?.inputs?.dataset_manifest;
+    const label = datasetManifest ? `loaded ${runDir} • dataset ${datasetManifest}` : `loaded ${runDir}`;
+    setVocabDetails(payload, label);
   } catch (err) {
     setVocabDetails({ raw: '' }, `failed to load vocab: ${err.message}`);
   }
@@ -98,13 +117,24 @@ async function loadVocabList() {
     const title = document.createElement('div');
     title.className = 'artifact-title';
     title.textContent = item.name ? `${item.name} v${item.version ?? '-'}` : item.run_id;
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    meta.textContent = `vocab ${item.vocab_size ?? '-'} • tokens ${item.token_count ?? '-'} • ${formatDate(item.created_at)}`;
-    const details = document.createElement('div');
-    details.className = 'meta';
-    const sizeLabel = item.input_bytes != null ? `input ${formatBytes(item.input_bytes)}` : 'input -';
-    details.textContent = `${sizeLabel} • ${item.run_dir}`;
+    const vocabMeta = document.createElement('div');
+    vocabMeta.className = 'meta';
+    vocabMeta.textContent = `vocab ${item.vocab_size ?? '-'}`;
+    const tokenMeta = document.createElement('div');
+    tokenMeta.className = 'meta';
+    tokenMeta.textContent = `tokens ${item.token_count ?? '-'}`;
+    const dateMeta = document.createElement('div');
+    dateMeta.className = 'meta';
+    dateMeta.textContent = formatDate(item.created_at);
+    const datasetMeta = document.createElement('div');
+    datasetMeta.className = 'meta';
+    datasetMeta.textContent = formatDatasetLabel(item.dataset_manifest);
+    const inputMeta = document.createElement('div');
+    inputMeta.className = 'meta';
+    inputMeta.textContent = item.input_bytes != null ? `input ${formatBytes(item.input_bytes)}` : 'input -';
+    const runMeta = document.createElement('div');
+    runMeta.className = 'meta';
+    runMeta.textContent = formatRunLabel(item.run_dir);
     const actions = document.createElement('div');
     actions.className = 'artifact-actions';
     const viewBtn = document.createElement('button');
@@ -116,8 +146,12 @@ async function loadVocabList() {
     actions.appendChild(viewBtn);
     actions.appendChild(deleteBtn);
     row.appendChild(title);
-    row.appendChild(meta);
-    row.appendChild(details);
+    row.appendChild(vocabMeta);
+    row.appendChild(tokenMeta);
+    row.appendChild(dateMeta);
+    row.appendChild(datasetMeta);
+    row.appendChild(inputMeta);
+    row.appendChild(runMeta);
     row.appendChild(actions);
     els.tokenizerVocabList.appendChild(row);
   });

@@ -360,6 +360,7 @@ class Handler(BaseHTTPRequestHandler):
                     config = manifest.get("config", {}) if isinstance(manifest, dict) else {}
                     meta = config.get("meta", {}) if isinstance(config, dict) else {}
                     input_path = report.get("input_path") or manifest.get("inputs", {}).get("input")
+                    dataset_manifest = manifest.get("inputs", {}).get("dataset_manifest")
                     input_bytes = None
                     if input_path:
                         try:
@@ -378,6 +379,7 @@ class Handler(BaseHTTPRequestHandler):
                             "vocab_size": report.get("vocab_size") or config.get("vocab_size"),
                             "token_count": report.get("token_count"),
                             "input_path": input_path,
+                            "dataset_manifest": dataset_manifest,
                             "input_bytes": input_bytes,
                             "tokenizer_path": report.get("output_path") or str(run_dir / "tokenizer.json"),
                         }

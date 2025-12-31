@@ -58,6 +58,7 @@ def run_pipeline(config: dict, repo_root: Path) -> dict:
                 tokenizer_input,
                 output_dir,
                 repo_root,
+                dataset_manifest=None,
             )
             tokenizer_path = result["output_path"]
             outputs["tokenizer"] = str(result["run_dir"])

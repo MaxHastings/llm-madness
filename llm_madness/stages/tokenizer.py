@@ -12,6 +12,7 @@ def run_tokenizer(
     input_path: Path,
     output_dir: Path,
     repo_root: Path,
+    dataset_manifest: Path | None = None,
 ) -> dict:
     run_id = config.get("run", {}).get("id") if isinstance(config.get("run"), dict) else None
     run_dir = ensure_dir(output_dir / (run_id or timestamp()))
@@ -20,7 +21,10 @@ def run_tokenizer(
         "tokenizer",
         run_dir,
         config,
-        inputs={"input": str(input_path)},
+        inputs={
+            "input": str(input_path),
+            "dataset_manifest": str(dataset_manifest) if dataset_manifest is not None else None,
+        },
         outputs={"tokenizer": str(output_path)},
         repo_root=repo_root,
     )

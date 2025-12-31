@@ -20,8 +20,9 @@ def main() -> None:
 
     config = load_config(args.config, overrides=args.set)
     input_path = args.input
-    if args.dataset_manifest is not None:
-        manifest = load_dataset_manifest(args.dataset_manifest)
+    dataset_manifest_path = args.dataset_manifest
+    if dataset_manifest_path is not None:
+        manifest = load_dataset_manifest(dataset_manifest_path)
         snapshot_path = Path(manifest.get("snapshot_path", ""))
         if not snapshot_path.exists():
             raise SystemExit(f"dataset snapshot missing: {snapshot_path}")
@@ -30,7 +31,7 @@ def main() -> None:
         raise SystemExit("no dataset provided; pass --input or --dataset-manifest")
     output_dir = args.output_dir or Path(config.get("output_dir", "runs/tokenizer"))
     repo_root = Path(__file__).resolve().parents[1]
-    result = run_tokenizer(config, input_path, output_dir, repo_root)
+    result = run_tokenizer(config, input_path, output_dir, repo_root, dataset_manifest=dataset_manifest_path)
     print(f"saved tokenizer to {result['output_path']}")
 
 
