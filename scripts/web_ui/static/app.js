@@ -6,6 +6,8 @@ import { initPrompt } from './modules/prompt.js';
 import { initTraining } from './modules/training.js';
 import { initInspect } from './modules/inspect.js';
 import { initDatasets } from './modules/datasets.js';
+import { initTokenizerConfigs } from './modules/tokenizer_configs.js';
+import { initTokenizerVocabs } from './modules/tokenizer_vocabs.js';
 
 initNav();
 initSession();
@@ -15,3 +17,5 @@ initInspect();
 initPipeline();
 initRuns();
 initDatasets();
+initTokenizerConfigs();
+initTokenizerVocabs();

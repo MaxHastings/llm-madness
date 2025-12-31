@@ -6,6 +6,7 @@ A lightweight, end-to-end text LLM pipeline with clear stages and timestamped ru
 
 - `data/` raw/curated text (gitignored)
 - `configs/` editable JSON configs (tracked)
+  - `configs/tokenizer/` versioned tokenizer configs
 - `runs/` timestamped tokenizer/train runs (gitignored)
 - `scripts/` pipeline entry points
 - `user_scripts/` your own utilities (gitignored; run manually)
@@ -28,7 +29,7 @@ A lightweight, end-to-end text LLM pipeline with clear stages and timestamped ru
 
 ```bash
 # 1) train tokenizer
-python -m scripts.train_tokenizer --config configs/tokenizer.json --input data/raw/your_data.txt
+python -m scripts.train_tokenizer --config configs/tokenizer/default__v001.json --input data/raw/your_data.txt
 
 # 2) train model
 python -m scripts.train_model --config configs/training.json --data data/raw/your_data.txt --tokenizer runs/tokenizer/latest/tokenizer.json

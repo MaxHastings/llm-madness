@@ -7,21 +7,87 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <header>
-    <div>
-      <h1>LLM Madness Inspector</h1>
-      <p class="subtitle">Decode how your model sees text and why it predicts what it does.</p>
-    </div>
-    <nav class="main-nav">
-      <button class="nav-btn active" data-section="runs">Runs</button>
-      <button class="nav-btn" data-section="datasets">Datasets</button>
-      <button class="nav-btn" data-section="pipeline">Pipeline</button>
-      <button class="nav-btn" data-section="inspector">Inspector</button>
-      <button class="nav-btn" data-section="training">Training</button>
-    </nav>
-  </header>
-  <main>
-    <section class="page-section active" data-section="runs">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>LLM Madness</h1>
+        <p class="subtitle">Local LLM experiments, clear artifacts.</p>
+      </div>
+      <nav class="side-nav">
+        <button class="nav-btn active" data-section="tokenizer-configs">Tokenizer Configs</button>
+        <button class="nav-btn" data-section="tokenizer-vocabs">Tokenizer Vocabularies</button>
+        <button class="nav-btn" data-section="datasets">Datasets</button>
+        <button class="nav-btn" data-section="pipeline">Run Setup</button>
+        <button class="nav-btn" data-section="runs">Runs</button>
+        <button class="nav-btn" data-section="inspector">Inspect</button>
+        <button class="nav-btn" data-section="training">Diagnostics</button>
+      </nav>
+    </aside>
+    <main>
+    <section class="page-section active" data-section="tokenizer-configs">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Tokenizer Configs</h2>
+            <p class="meta">Save every change as a new version.</p>
+          </div>
+          <div class="controls">
+            <button id="tokenizerConfigNew" class="primary">New</button>
+            <button id="tokenizerConfigDuplicate">Duplicate</button>
+            <button id="tokenizerConfigSave" class="primary">Save New Version</button>
+            <button id="tokenizerConfigDelete">Delete</button>
+          </div>
+        </div>
+        <div class="split">
+          <div class="panel-list">
+            <h3>Versions</h3>
+            <div id="tokenizerConfigList" class="config-list"></div>
+          </div>
+          <div class="panel-editor">
+            <h3>Config JSON</h3>
+            <textarea id="tokenizerConfigEditor" spellcheck="false"></textarea>
+            <div class="meta" id="tokenizerConfigMeta"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" data-section="tokenizer-vocabs">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Tokenizer Vocabularies</h2>
+            <p class="meta">Generated artifacts tied to config + dataset.</p>
+          </div>
+          <div class="controls">
+            <button id="tokenizerVocabRefresh" class="primary">Refresh</button>
+          </div>
+        </div>
+        <div class="split">
+          <div class="panel-list">
+            <h3>Vocab Runs</h3>
+            <div id="tokenizerVocabList" class="artifact-list"></div>
+          </div>
+          <div class="panel-editor">
+            <h3>Create New Vocab</h3>
+            <div class="controls">
+              <select id="tokenizerVocabConfigSelect"></select>
+              <button id="tokenizerVocabRefreshConfigs">Refresh Configs</button>
+            </div>
+            <div class="controls">
+              <select id="tokenizerVocabDatasetSelect"></select>
+              <button id="tokenizerVocabRefreshDatasets">Refresh Datasets</button>
+            </div>
+            <div class="controls">
+              <button id="tokenizerVocabCreate" class="primary">Generate Vocab</button>
+            </div>
+            <div class="meta" id="tokenizerVocabMeta"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" data-section="runs">
       <div class="panel runs-workspace">
         <div class="panel-head">
           <div>
@@ -230,7 +296,8 @@
         </div>
       </div>
     </section>
-  </main>
+    </main>
+  </div>
 
   <script type="module" src="/static/app.js"></script>
 </body>

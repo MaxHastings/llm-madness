@@ -26,7 +26,7 @@ async function loadDatasets() {
 }
 
 async function loadConfigs() {
-  const data = await api('/api/configs');
+  const data = await api('/api/configs', { scope: 'pipeline' });
   els.configSelect.innerHTML = '';
   data.configs.forEach((name) => {
     const opt = document.createElement('option');

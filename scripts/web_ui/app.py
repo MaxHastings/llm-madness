@@ -35,6 +35,7 @@ CONFIGS_DIR = Path("configs")
 RUNS_ROOT = Path("runs")
 DATA_ROOT = Path("data")
 DATASETS_DIR = RUNS_ROOT / "datasets"
+TOKENIZER_RUNS_DIR = RUNS_ROOT / "tokenizer"
 RUN_PROCS: dict[str, dict] = {}
 
 
@@ -111,6 +112,50 @@ def normalize_status(status: str | None) -> str:
 
 def is_any_run_active() -> bool:
     return any(info["process"].poll() is None for info in RUN_PROCS.values())
+
+
+def list_config_paths(scope: str) -> list[Path]:
+    scope = (scope or "pipeline").lower()
+    if scope == "pipeline":
+        return sorted(
+            [
+                path
+                for path in CONFIGS_DIR.iterdir()
+                if path.is_file() and path.suffix == ".json" and path.name.startswith("pipeline")
+            ]
+        )
+    if scope == "tokenizer":
+        base = CONFIGS_DIR / "tokenizer"
+        if not base.exists():
+            return []
+        return sorted([path for path in base.iterdir() if path.is_file() and path.suffix == ".json"])
+    if scope == "training":
+        base = CONFIGS_DIR / "training"
+        if not base.exists():
+            return []
+        return sorted([path for path in base.iterdir() if path.is_file() and path.suffix == ".json"])
+    if scope == "all":
+        return sorted(CONFIGS_DIR.rglob("*.json"))
+    raise ValueError(f"unknown config scope: {scope}")
+
+
+def describe_config(path: Path) -> dict:
+    rel = str(path.relative_to(CONFIGS_DIR))
+    payload: dict = {}
+    try:
+        payload = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        payload = {}
+    meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
+    return {
+        "name": meta.get("name") or path.stem,
+        "version": meta.get("version"),
+        "created_at": meta.get("created_at"),
+        "id": meta.get("id"),
+        "path": rel,
+        "vocab_size": payload.get("vocab_size") if isinstance(payload, dict) else None,
+        "algorithm": payload.get("algorithm") if isinstance(payload, dict) else None,
+    }
 
 
 def infer_stage(run_dir: Path, manifest: dict | None) -> str:
@@ -265,6 +310,53 @@ class Handler(BaseHTTPRequestHandler):
                     )
             self._send_json({"datasets": datasets})
             return
+        if self.path == "/api/tokenizer_vocabs":
+            vocabs = []
+            if TOKENIZER_RUNS_DIR.exists():
+                for run_dir in sorted(TOKENIZER_RUNS_DIR.iterdir(), reverse=True):
+                    if not run_dir.is_dir():
+                        continue
+                    manifest_path = run_dir / "run.json"
+                    if not manifest_path.exists():
+                        continue
+                    try:
+                        manifest = json.loads(manifest_path.read_text())
+                    except json.JSONDecodeError:
+                        continue
+                    report_path = run_dir / "report.json"
+                    report = {}
+                    if report_path.exists():
+                        try:
+                            report = json.loads(report_path.read_text())
+                        except json.JSONDecodeError:
+                            report = {}
+                    config = manifest.get("config", {}) if isinstance(manifest, dict) else {}
+                    meta = config.get("meta", {}) if isinstance(config, dict) else {}
+                    input_path = report.get("input_path") or manifest.get("inputs", {}).get("input")
+                    input_bytes = None
+                    if input_path:
+                        try:
+                            input_bytes = Path(input_path).stat().st_size
+                        except FileNotFoundError:
+                            input_bytes = None
+                    vocabs.append(
+                        {
+                            "run_id": run_dir.name,
+                            "run_dir": str(run_dir),
+                            "status": manifest.get("status"),
+                            "created_at": manifest.get("start_time"),
+                            "name": meta.get("name"),
+                            "version": meta.get("version"),
+                            "config_id": meta.get("id"),
+                            "vocab_size": report.get("vocab_size") or config.get("vocab_size"),
+                            "token_count": report.get("token_count"),
+                            "input_path": input_path,
+                            "input_bytes": input_bytes,
+                            "tokenizer_path": report.get("output_path") or str(run_dir / "tokenizer.json"),
+                        }
+                    )
+            self._send_json({"vocabs": vocabs})
+            return
         if self.path.startswith("/api/run/stream"):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
@@ -409,10 +501,20 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/api/configs":
                 configs = []
+                payload = self._read_json()
+                scope = payload.get("scope", "pipeline") if isinstance(payload, dict) else "pipeline"
                 if CONFIGS_DIR.exists():
-                    for path in sorted(CONFIGS_DIR.rglob("*.json")):
-                        rel = path.relative_to(CONFIGS_DIR)
-                        configs.append(str(rel))
+                    for path in list_config_paths(scope):
+                        configs.append(str(path.relative_to(CONFIGS_DIR)))
+                self._send_json({"configs": configs})
+                return
+            if self.path == "/api/configs/meta":
+                payload = self._read_json()
+                scope = payload.get("scope", "pipeline") if isinstance(payload, dict) else "pipeline"
+                configs = []
+                if CONFIGS_DIR.exists():
+                    for path in list_config_paths(scope):
+                        configs.append(describe_config(path))
                 self._send_json({"configs": configs})
                 return
             if self.path == "/api/configs/save":
@@ -434,6 +536,22 @@ class Handler(BaseHTTPRequestHandler):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(raw)
                 self._send_json({"status": "saved", "name": name})
+                return
+            if self.path == "/api/configs/delete":
+                payload = self._read_json()
+                name = payload.get("name")
+                if not name:
+                    self._send_json({"error": "name required"}, status=400)
+                    return
+                target = (CONFIGS_DIR / name).resolve()
+                if CONFIGS_DIR.resolve() not in target.parents:
+                    self._send_json({"error": "invalid config path"}, status=400)
+                    return
+                if not target.exists():
+                    self._send_json({"error": "config not found"}, status=404)
+                    return
+                target.unlink()
+                self._send_json({"status": "deleted", "name": name})
                 return
             if self.path == "/api/datasets/create":
                 payload = self._read_json()

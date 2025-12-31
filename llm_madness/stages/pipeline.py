@@ -45,7 +45,7 @@ def run_pipeline(config: dict, repo_root: Path) -> dict:
         tokenizer_input = None
 
         if tokenizer_cfg.get("enabled", True):
-            tokenizer_config_path = tokenizer_cfg.get("config", "configs/tokenizer.json")
+            tokenizer_config_path = tokenizer_cfg.get("config", "configs/tokenizer/default__v001.json")
             tokenizer_config = load_config(Path(tokenizer_config_path))
             input_path = tokenizer_cfg.get("input")
             if input_path is None:

@@ -66,4 +66,21 @@ export const els = {
 
   datasetSelect: byId('datasetSelect'),
   refreshDatasetsBtn: byId('refreshDatasets'),
+
+  tokenizerConfigList: byId('tokenizerConfigList'),
+  tokenizerConfigEditor: byId('tokenizerConfigEditor'),
+  tokenizerConfigMeta: byId('tokenizerConfigMeta'),
+  tokenizerConfigNewBtn: byId('tokenizerConfigNew'),
+  tokenizerConfigSaveBtn: byId('tokenizerConfigSave'),
+  tokenizerConfigDuplicateBtn: byId('tokenizerConfigDuplicate'),
+  tokenizerConfigDeleteBtn: byId('tokenizerConfigDelete'),
+
+  tokenizerVocabList: byId('tokenizerVocabList'),
+  tokenizerVocabRefreshBtn: byId('tokenizerVocabRefresh'),
+  tokenizerVocabConfigSelect: byId('tokenizerVocabConfigSelect'),
+  tokenizerVocabRefreshConfigsBtn: byId('tokenizerVocabRefreshConfigs'),
+  tokenizerVocabDatasetSelect: byId('tokenizerVocabDatasetSelect'),
+  tokenizerVocabRefreshDatasetsBtn: byId('tokenizerVocabRefreshDatasets'),
+  tokenizerVocabCreateBtn: byId('tokenizerVocabCreate'),
+  tokenizerVocabMeta: byId('tokenizerVocabMeta'),
 };
