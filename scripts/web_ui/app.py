@@ -221,6 +221,12 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    def handle_one_request(self) -> None:
+        try:
+            super().handle_one_request()
+        except ConnectionResetError:
+            return
+
     def _send_json(self, payload: dict, status: int = 200) -> None:
         data = json.dumps(payload).encode("utf-8")
         self.send_response(status)
