@@ -29,6 +29,19 @@ function formatDatasetLabel(path) {
   return `dataset ${file}`;
 }
 
+function formatDatasetTitle(item) {
+  if (!item) return null;
+  const name = item.dataset_name;
+  const id = item.dataset_id;
+  if (name && id) return `${name} (${id})`;
+  if (name) return name;
+  if (id) return id;
+  if (item.dataset_manifest) {
+    return formatDatasetLabel(item.dataset_manifest).replace(/^dataset\s+/i, '');
+  }
+  return null;
+}
+
 function formatRunLabel(runDir) {
   if (!runDir) return 'run -';
   const parts = runDir.split('/').filter(Boolean);
@@ -117,6 +130,10 @@ async function loadVocabList() {
     const title = document.createElement('div');
     title.className = 'artifact-title';
     title.textContent = item.name ? `${item.name} v${item.version ?? '-'}` : item.run_id;
+    const datasetTitle = document.createElement('div');
+    datasetTitle.className = 'meta';
+    const datasetLabel = formatDatasetTitle(item);
+    datasetTitle.textContent = datasetLabel ? `dataset ${datasetLabel}` : formatDatasetLabel(item.dataset_manifest);
     const vocabMeta = document.createElement('div');
     vocabMeta.className = 'meta';
     vocabMeta.textContent = `vocab ${item.vocab_size ?? '-'}`;
@@ -126,9 +143,6 @@ async function loadVocabList() {
     const dateMeta = document.createElement('div');
     dateMeta.className = 'meta';
     dateMeta.textContent = formatDate(item.created_at);
-    const datasetMeta = document.createElement('div');
-    datasetMeta.className = 'meta';
-    datasetMeta.textContent = formatDatasetLabel(item.dataset_manifest);
     const inputMeta = document.createElement('div');
     inputMeta.className = 'meta';
     inputMeta.textContent = item.input_bytes != null ? `input ${formatBytes(item.input_bytes)}` : 'input -';
@@ -146,10 +160,10 @@ async function loadVocabList() {
     actions.appendChild(viewBtn);
     actions.appendChild(deleteBtn);
     row.appendChild(title);
+    row.appendChild(datasetTitle);
     row.appendChild(vocabMeta);
     row.appendChild(tokenMeta);
     row.appendChild(dateMeta);
-    row.appendChild(datasetMeta);
     row.appendChild(inputMeta);
     row.appendChild(runMeta);
     row.appendChild(actions);
@@ -200,6 +214,7 @@ async function loadDatasets() {
 async function createVocab() {
   const config = els.tokenizerVocabConfigSelect.value;
   const datasetManifest = els.tokenizerVocabDatasetSelect.value;
+  const runName = (els.tokenizerVocabName.value || '').trim();
   if (!config) {
     els.tokenizerVocabMeta.textContent = 'Select a tokenizer config.';
     return;
@@ -212,6 +227,7 @@ async function createVocab() {
     stage: 'tokenizer',
     config,
     dataset_manifest: datasetManifest,
+    run_name: runName || null,
   });
   if (res.run_id) {
     els.tokenizerVocabMeta.textContent = `started tokenizer run ${res.run_id}`;

@@ -447,6 +447,17 @@ class Handler(BaseHTTPRequestHandler):
                     meta = config.get("meta", {}) if isinstance(config, dict) else {}
                     input_path = report.get("input_path") or manifest.get("inputs", {}).get("input")
                     dataset_manifest = manifest.get("inputs", {}).get("dataset_manifest")
+                    dataset_name = None
+                    dataset_id = None
+                    if dataset_manifest:
+                        try:
+                            dataset_payload = json.loads(Path(dataset_manifest).read_text())
+                            if isinstance(dataset_payload, dict):
+                                dataset_name = dataset_payload.get("name")
+                                dataset_id = dataset_payload.get("id")
+                        except (FileNotFoundError, json.JSONDecodeError):
+                            dataset_name = None
+                            dataset_id = None
                     input_bytes = None
                     if input_path:
                         try:
@@ -466,6 +477,8 @@ class Handler(BaseHTTPRequestHandler):
                             "token_count": report.get("token_count"),
                             "input_path": input_path,
                             "dataset_manifest": dataset_manifest,
+                            "dataset_name": dataset_name,
+                            "dataset_id": dataset_id,
                             "input_bytes": input_bytes,
                             "tokenizer_path": report.get("output_path") or str(run_dir / "tokenizer.json"),
                         }
@@ -748,6 +761,7 @@ class Handler(BaseHTTPRequestHandler):
                 config_name = payload.get("config", "training/default__v001.json")
                 dataset_manifest = payload.get("dataset_manifest")
                 tokenizer_path = payload.get("tokenizer_path")
+                run_name = payload.get("run_name")
                 if stage not in {"tokenizer", "train"}:
                     self._send_json({"error": "unsupported stage"}, status=400)
                     return
@@ -787,6 +801,8 @@ class Handler(BaseHTTPRequestHandler):
                         self._send_json({"error": "dataset manifest required for tokenizer run"}, status=400)
                         return
                     cmd += ["scripts.train_tokenizer", "--config", str(config_path), "--set", f"run.id={run_id}"]
+                    if run_name:
+                        cmd += ["--set", f"meta.name={run_name}"]
                     cmd += ["--dataset-manifest", str(dataset_manifest_path)]
                     run_dir = RUNS_ROOT / "tokenizer" / run_id
                 elif stage == "train":
