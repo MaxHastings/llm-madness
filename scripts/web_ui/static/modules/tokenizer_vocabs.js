@@ -1,5 +1,6 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
+import { loadTokenizerVocabs, setTokenizerVocabSelection } from './pipeline.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -42,9 +43,22 @@ async function loadVocabList() {
     details.className = 'meta';
     const sizeLabel = item.input_bytes != null ? `input ${formatBytes(item.input_bytes)}` : 'input -';
     details.textContent = `${sizeLabel} • ${item.run_dir}`;
+    const actions = document.createElement('div');
+    actions.className = 'artifact-actions';
+    const useBtn = document.createElement('button');
+    useBtn.textContent = 'Use in Run';
+    useBtn.addEventListener('click', async () => {
+      if (!item.tokenizer_path) return;
+      await loadTokenizerVocabs();
+      setTokenizerVocabSelection(item.tokenizer_path);
+      const navBtn = document.querySelector('[data-section="runs"]');
+      if (navBtn) navBtn.click();
+    });
+    actions.appendChild(useBtn);
     row.appendChild(title);
     row.appendChild(meta);
     row.appendChild(details);
+    row.appendChild(actions);
     els.tokenizerVocabList.appendChild(row);
   });
 }
@@ -122,4 +136,3 @@ export function initTokenizerVocabs() {
   loadConfigs();
   loadDatasets();
 }
-

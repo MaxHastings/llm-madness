@@ -25,6 +25,36 @@ async function loadDatasets() {
   });
 }
 
+export async function loadTokenizerVocabs() {
+  const data = await fetchJson('/api/tokenizer_vocabs');
+  const items = data.vocabs || [];
+  els.runTokenizerVocabSelect.innerHTML = '';
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = 'No tokenizer vocab';
+  els.runTokenizerVocabSelect.appendChild(none);
+  items.forEach((item) => {
+    const opt = document.createElement('option');
+    opt.value = item.tokenizer_path || '';
+    const name = item.name ? `${item.name} v${item.version ?? '-'}` : item.run_id;
+    const vocab = item.vocab_size != null ? `vocab ${item.vocab_size}` : '';
+    opt.textContent = [name, vocab].filter(Boolean).join(' • ');
+    els.runTokenizerVocabSelect.appendChild(opt);
+  });
+}
+
+export function setTokenizerVocabSelection(path) {
+  if (!path) return;
+  const exists = Array.from(els.runTokenizerVocabSelect.options).some((opt) => opt.value === path);
+  if (!exists) {
+    const opt = document.createElement('option');
+    opt.value = path;
+    opt.textContent = path.split('/').slice(-2).join('/');
+    els.runTokenizerVocabSelect.appendChild(opt);
+  }
+  els.runTokenizerVocabSelect.value = path;
+}
+
 async function loadConfigs() {
   const data = await api('/api/configs', { scope: 'pipeline' });
   els.configSelect.innerHTML = '';
@@ -84,6 +114,10 @@ async function startRun(stage) {
     const datasetManifest = els.datasetSelect.value;
     if (datasetManifest) payload.dataset_manifest = datasetManifest;
   }
+  if (stage === 'train') {
+    const tokenizerPath = els.runTokenizerVocabSelect.value;
+    if (tokenizerPath) payload.tokenizer_path = tokenizerPath;
+  }
   const data = await api('/api/run', payload);
   els.configMeta.textContent = data.run_id ? `started ${stage} (${data.run_id})` : data.error || 'run failed';
   await refreshRunList();
@@ -97,6 +131,8 @@ export function initPipeline() {
   els.runTokenizerBtn.addEventListener('click', () => startRun('tokenizer'));
   els.runTrainBtn.addEventListener('click', () => startRun('train'));
   els.refreshDatasetsBtn.addEventListener('click', loadDatasets);
+  els.refreshTokenizerVocabsBtn.addEventListener('click', loadTokenizerVocabs);
   loadConfigs().then(loadSelectedConfig);
   loadDatasets();
+  loadTokenizerVocabs();
 }

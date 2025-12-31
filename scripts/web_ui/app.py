@@ -593,6 +593,7 @@ class Handler(BaseHTTPRequestHandler):
                 stage = payload.get("stage", "pipeline")
                 config_name = payload.get("config", "pipeline.json")
                 dataset_manifest = payload.get("dataset_manifest")
+                tokenizer_path = payload.get("tokenizer_path")
                 if config_name.startswith("configs/"):
                     config_name = config_name[len("configs/"):]
                 config_path = (CONFIGS_DIR / config_name).resolve()
@@ -612,6 +613,16 @@ class Handler(BaseHTTPRequestHandler):
                         self._send_json({"error": "dataset manifest not found"}, status=404)
                         return
                     dataset_manifest_path = candidate
+                tokenizer_path_resolved = None
+                if tokenizer_path:
+                    candidate = Path(str(tokenizer_path)).resolve()
+                    if RUNS_ROOT.resolve() not in candidate.parents:
+                        self._send_json({"error": "invalid tokenizer path"}, status=400)
+                        return
+                    if not candidate.exists():
+                        self._send_json({"error": "tokenizer path not found"}, status=404)
+                        return
+                    tokenizer_path_resolved = candidate
                 run_id = timestamp()
                 cmd = [sys.executable, "-m"]
                 if stage == "pipeline":
@@ -626,6 +637,8 @@ class Handler(BaseHTTPRequestHandler):
                     cmd += ["scripts.train_model", "--config", str(config_path), "--set", f"run.id={run_id}"]
                     if dataset_manifest_path is not None:
                         cmd += ["--dataset-manifest", str(dataset_manifest_path)]
+                    if tokenizer_path_resolved is not None:
+                        cmd += ["--tokenizer", str(tokenizer_path_resolved)]
                     run_dir = Path("runs/train") / run_id
                 else:
                     self._send_json({"error": f"unknown stage '{stage}'"}, status=400)

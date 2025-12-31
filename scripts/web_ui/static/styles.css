@@ -176,6 +176,12 @@ main {
   margin-bottom: 6px;
 }
 
+.artifact-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
 .panel-head {
   display: flex;
   justify-content: space-between;

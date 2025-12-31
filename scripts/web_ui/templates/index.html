@@ -18,8 +18,7 @@
         <button class="nav-btn" data-section="tokenizer-vocabs">Tokenizer Vocabularies</button>
         <button class="nav-btn" data-section="datasets">Datasets</button>
         <button class="nav-btn" data-section="training-configs">Training Configs</button>
-        <button class="nav-btn" data-section="pipeline">Run Setup</button>
-        <button class="nav-btn" data-section="runs">Runs</button>
+        <button class="nav-btn" data-section="runs">Training Runs</button>
         <button class="nav-btn" data-section="inspector">Inspect</button>
         <button class="nav-btn" data-section="training">Diagnostics</button>
       </nav>
@@ -117,6 +116,31 @@
     </section>
 
     <section class="page-section" data-section="runs">
+      <div class="panel">
+        <h2>Run Setup</h2>
+        <div class="controls">
+          <select id="configSelect"></select>
+          <button id="loadConfig" class="primary">Load</button>
+          <button id="saveConfig">Save</button>
+          <span class="meta" id="configMeta"></span>
+        </div>
+        <div class="controls">
+          <select id="datasetSelect"></select>
+          <button id="refreshDatasets" class="primary">Refresh Datasets</button>
+          <span class="meta">Applies to Tokenizer/Train</span>
+        </div>
+        <div class="controls">
+          <button class="primary" data-run="pipeline" id="runPipeline">Create Run</button>
+          <button data-run="tokenizer" id="runTokenizer">Tokenizer</button>
+          <button data-run="train" id="runTrain">Train</button>
+        </div>
+        <div class="controls">
+          <select id="runTokenizerVocabSelect"></select>
+          <button id="refreshTokenizerVocabs">Refresh Vocabs</button>
+          <span class="meta">Applies to Train</span>
+        </div>
+        <textarea id="configEditor" placeholder="Select a config to edit..." spellcheck="false"></textarea>
+      </div>
       <div class="panel runs-workspace">
         <div class="panel-head">
           <div>
@@ -201,28 +225,6 @@
       </div>
     </section>
 
-    <section class="page-section" data-section="pipeline">
-      <div class="panel">
-        <h2>Pipeline Control</h2>
-        <div class="controls">
-          <select id="configSelect"></select>
-          <button id="loadConfig" class="primary">Load</button>
-          <button id="saveConfig">Save</button>
-          <span class="meta" id="configMeta"></span>
-        </div>
-        <div class="controls">
-          <select id="datasetSelect"></select>
-          <button id="refreshDatasets" class="primary">Refresh Datasets</button>
-          <span class="meta">Applies to Tokenizer/Train</span>
-        </div>
-        <div class="controls">
-          <button class="primary" data-run="pipeline" id="runPipeline">Run Pipeline</button>
-          <button data-run="tokenizer" id="runTokenizer">Tokenizer</button>
-          <button data-run="train" id="runTrain">Train</button>
-        </div>
-        <textarea id="configEditor" placeholder="Select a config to edit..." spellcheck="false"></textarea>
-      </div>
-    </section>
     <section class="page-section" data-section="inspector">
       <div class="panel">
         <h2>Model Session</h2>

@@ -67,6 +67,9 @@ export const els = {
   datasetSelect: byId('datasetSelect'),
   refreshDatasetsBtn: byId('refreshDatasets'),
 
+  runTokenizerVocabSelect: byId('runTokenizerVocabSelect'),
+  refreshTokenizerVocabsBtn: byId('refreshTokenizerVocabs'),
+
   tokenizerConfigList: byId('tokenizerConfigList'),
   tokenizerConfigEditor: byId('tokenizerConfigEditor'),
   tokenizerConfigMeta: byId('tokenizerConfigMeta'),
