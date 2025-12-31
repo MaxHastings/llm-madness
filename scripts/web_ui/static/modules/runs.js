@@ -7,6 +7,8 @@ let selectedRun = null;
 let selectedRunDetails = null;
 let currentLogTab = 'logs';
 let autoRefreshEnabled = true;
+let liveLogsEnabled = true;
+let logStream = null;
 
 function formatTime(ts) {
   if (!ts) return '-';
@@ -276,6 +278,9 @@ function setLogTab(tab) {
   }
   const lines = tab === 'process' ? selectedRunDetails.process_log : selectedRunDetails.logs;
   els.runLogs.textContent = (lines || []).join('\n') || 'No logs available.';
+  if (liveLogsEnabled) {
+    startLogStream(tab);
+  }
 }
 
 async function showRunDetails(runDir) {
@@ -286,6 +291,7 @@ async function showRunDetails(runDir) {
     process_log: data.process_log || [],
   };
   autoRefreshEnabled = false;
+  liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
   els.runDetailMeta.textContent = selectedRun ? `${selectedRun.stage} | ${selectedRun.run_id}` : 'Run detail';
   els.runLoadStatus.textContent = 'Auto-refresh paused while viewing this run.';
   els.loadRunFromDrawer.disabled = !(selectedRun && selectedRun.stage === 'train');
@@ -293,6 +299,73 @@ async function showRunDetails(runDir) {
   renderManifest(data.manifest);
   setLogTab(currentLogTab);
   renderRunsFromCache();
+}
+
+function stopLogStream() {
+  if (logStream) {
+    logStream.close();
+    logStream = null;
+  }
+}
+
+function startLogStream(kind) {
+  if (!selectedRun) return;
+  stopLogStream();
+  const params = new URLSearchParams({
+    run_dir: selectedRun.run_dir,
+    kind,
+  });
+  logStream = new EventSource(`/api/run/stream?${params.toString()}`);
+  if (kind === 'logs') {
+    selectedRunDetails.logs = [];
+  } else {
+    selectedRunDetails.process_log = [];
+  }
+  els.runLogs.textContent = '';
+  logStream.onmessage = (event) => {
+    if (!event.data) return;
+    if (kind === 'logs') {
+      selectedRunDetails.logs.push(event.data);
+      if (selectedRunDetails.logs.length > 500) {
+        selectedRunDetails.logs = selectedRunDetails.logs.slice(-500);
+      }
+    } else {
+      selectedRunDetails.process_log.push(event.data);
+      if (selectedRunDetails.process_log.length > 500) {
+        selectedRunDetails.process_log = selectedRunDetails.process_log.slice(-500);
+      }
+    }
+    if (currentLogTab === kind) {
+      els.runLogs.textContent += `${event.data}\n`;
+      els.runLogs.scrollTop = els.runLogs.scrollHeight;
+    }
+    const now = new Date();
+    const stamp = now.toTimeString().slice(0, 8);
+    els.runLoadStatus.textContent = `Live stream connected | ${stamp}`;
+  };
+  logStream.onerror = () => {
+    els.runLoadStatus.textContent = 'Live stream disconnected. Retrying...';
+  };
+}
+
+async function refreshSelectedRunDetails() {
+  if (!selectedRun) return;
+  const data = await fetchJson(`/api/run/${encodeURIComponent(selectedRun.run_dir)}`);
+  selectedRun = data.summary || selectedRun;
+  if (!liveLogsEnabled) {
+    selectedRunDetails = {
+      logs: data.logs || [],
+      process_log: data.process_log || [],
+    };
+  }
+  renderSummary(data.summary);
+  renderManifest(data.manifest);
+  if (!liveLogsEnabled) {
+    setLogTab(currentLogTab);
+  }
+  const now = new Date();
+  const stamp = now.toTimeString().slice(0, 8);
+  els.runLoadStatus.textContent = `Live logs refreshed at ${stamp}`;
 }
 
 function clearRunDetail() {
@@ -305,6 +378,8 @@ function clearRunDetail() {
   els.runLogs.textContent = '';
   els.loadRunFromDrawer.disabled = true;
   autoRefreshEnabled = true;
+  liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
+  stopLogStream();
 }
 
 function renderRunsFromCache() {
@@ -330,6 +405,15 @@ export function initRuns() {
   els.runsFilterStage.addEventListener('change', renderRunsFromCache);
   els.runsFilterStatus.addEventListener('change', renderRunsFromCache);
   els.runsSort.addEventListener('change', renderRunsFromCache);
+  els.liveRunLogs.addEventListener('change', () => {
+    liveLogsEnabled = els.liveRunLogs.checked;
+    if (liveLogsEnabled) {
+      refreshSelectedRunDetails();
+      startLogStream(currentLogTab);
+    } else {
+      stopLogStream();
+    }
+  });
   els.loadRunFromDrawer.addEventListener('click', async () => {
     if (!selectedRun) return;
     await loadRunIntoInspector(selectedRun);
@@ -341,10 +425,15 @@ export function initRuns() {
   document.querySelectorAll('.run-tabs .tab').forEach((btn) => {
     btn.addEventListener('click', () => setLogTab(btn.dataset.tab));
   });
+  liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
   refreshRunList();
   setInterval(() => {
     if (autoRefreshEnabled) {
       refreshRunList();
+    }
+    if (!selectedRun) return;
+    if (liveLogsEnabled || (els.liveRunLogs && els.liveRunLogs.checked)) {
+      refreshSelectedRunDetails();
     }
   }, 8000);
 }

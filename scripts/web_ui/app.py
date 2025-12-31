@@ -5,10 +5,11 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote, urlparse
 
 import torch
 
@@ -190,6 +191,69 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path.startswith("/api/run/stream"):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            run_dir = params.get("run_dir", [""])[0]
+            kind = params.get("kind", ["logs"])[0]
+            if not run_dir:
+                self._send_json({"error": "run_dir required"}, status=400)
+                return
+            run_path = Path(unquote(run_dir)).resolve()
+            if run_path.exists() and run_path.is_dir():
+                if RUNS_ROOT.resolve() not in run_path.parents and DATA_ROOT.resolve() not in run_path.parents:
+                    self._send_json({"error": "invalid run path"}, status=400)
+                    return
+                filename = "logs.jsonl" if kind == "logs" else "process.log"
+                target = run_path / filename
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
+                self.end_headers()
+
+                def send_line(line: str) -> None:
+                    payload = f"data: {line.rstrip()}\n\n".encode("utf-8")
+                    self.wfile.write(payload)
+                    self.wfile.flush()
+
+                last_ping = time.time()
+                try:
+                    last_size = -1
+                    while True:
+                        if not target.exists():
+                            time.sleep(1)
+                            continue
+                        size = target.stat().st_size
+                        if size < last_size:
+                            last_size = -1
+                        if last_size == -1:
+                            with target.open("r", encoding="utf-8", errors="ignore") as handle:
+                                lines = handle.read().splitlines()[-200:]
+                                for line in lines:
+                                    send_line(line)
+                            last_size = target.stat().st_size
+
+                        with target.open("r", encoding="utf-8", errors="ignore") as handle:
+                            handle.seek(last_size)
+                            while True:
+                                line = handle.readline()
+                                if line:
+                                    send_line(line)
+                                else:
+                                    break
+                            last_size = handle.tell()
+
+                        if time.time() - last_ping > 10:
+                            self.wfile.write(b": ping\n\n")
+                            self.wfile.flush()
+                            last_ping = time.time()
+                        time.sleep(1)
+                except (BrokenPipeError, ConnectionResetError):
+                    return
+                return
+            self._send_json({"error": "run not found"}, status=404)
+            return
         if self.path.startswith("/api/configs/"):
             rel = unquote(self.path[len("/api/configs/"):])
             target = (CONFIGS_DIR / rel).resolve()

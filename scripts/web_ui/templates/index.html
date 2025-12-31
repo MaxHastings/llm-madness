@@ -52,6 +52,10 @@
                 <div class="meta" id="runDetailMeta">Select a run to inspect.</div>
               </div>
               <div class="drawer-actions">
+                <label class="meta drawer-toggle">
+                  <input type="checkbox" id="liveRunLogs" checked />
+                  Live logs
+                </label>
                 <button id="loadRunFromDrawer" class="primary" disabled>Load into Inspector</button>
                 <button id="clearRunDetail">Clear</button>
               </div>
@@ -92,6 +96,11 @@
         <h2>Model Session</h2>
         <div class="controls">
           <span class="meta" id="runMeta">Loading run...</span>
+        </div>
+        <div class="controls">
+          <select id="sessionRunSelect"></select>
+          <button id="loadSessionRun" class="primary">Load Run</button>
+          <span class="meta" id="sessionRunMeta"></span>
         </div>
         <div class="controls">
           <select id="checkpointSelect"></select>

@@ -353,6 +353,13 @@ button.token-btn:hover {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.drawer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .run-summary,

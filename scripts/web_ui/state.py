@@ -8,6 +8,7 @@ import torch
 
 from llm_madness.model import GPT, GPTConfig
 from llm_madness.tokenizer import load_tokenizer
+from llm_madness.utils import find_latest_run
 
 from .inspect import attention_from_trace, mlp_from_trace
 
@@ -16,15 +17,49 @@ class ServerState:
     def __init__(self, run_dir: Path, checkpoint: str | None, device_override: str):
         self.run_dir = run_dir
         self.run_config = json.loads((run_dir / "run.json").read_text())
-        self.tokenizer = load_tokenizer(run_dir / "tokenizer.json")
+        self.tokenizer = load_tokenizer(self._resolve_tokenizer_path())
         data_path = self.run_config.get("inputs", {}).get("data")
-        self.data_path = Path(data_path) if data_path else None
+        self.data_path = self._resolve_data_path(data_path) if data_path else None
+        self.data_path_error: str | None = None
+        if self.data_path is None and data_path:
+            self.data_path_error = f"missing data file: {data_path}"
         self._tokenizer_report: dict | None = None
         device_name = device_override if device_override != "auto" else self.run_config.get("outputs", {}).get("device", "auto")
         self.device = select_device(device_name)
         self.model = self._build_model()
         self.current_checkpoint: str | None = None
         self.load_checkpoint(checkpoint)
+
+    def _resolve_tokenizer_path(self) -> Path:
+        primary = self.run_dir / "tokenizer.json"
+        if primary.exists():
+            return primary
+        fallback = self.run_config.get("inputs", {}).get("tokenizer")
+        if fallback:
+            candidate = self._resolve_latest(Path(fallback))
+            if candidate.exists():
+                return candidate
+        raise FileNotFoundError(f"tokenizer.json not found for run: {self.run_dir}")
+
+    def _resolve_data_path(self, raw: str | None) -> Path | None:
+        if not raw:
+            return None
+        candidate = self._resolve_latest(Path(raw))
+        if candidate.exists():
+            return candidate
+        return None
+
+    def _resolve_latest(self, path: Path) -> Path:
+        if "latest" not in path.parts:
+            return path
+        parts = list(path.parts)
+        idx = parts.index("latest")
+        base = Path(*parts[:idx])
+        suffix = Path(*parts[idx + 1 :])
+        latest = find_latest_run(base)
+        if latest is None:
+            return path
+        return latest / suffix
 
     def _build_model(self) -> GPT:
         model_cfg = self.run_config.get("config", {}).get("model", {})
@@ -51,7 +86,8 @@ class ServerState:
         if self._tokenizer_report is not None:
             return self._tokenizer_report
         if self.data_path is None or not self.data_path.exists():
-            return {"error": "data_path missing; rerun training with a dataset"}
+            detail = self.data_path_error or "data_path missing; rerun training with a dataset"
+            return {"error": detail}
         text = self.data_path.read_text(errors="ignore")
         if len(text) > max_chars:
             text = text[:max_chars]

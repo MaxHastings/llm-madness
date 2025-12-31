@@ -14,6 +14,9 @@ export const els = {
   checkpointMeta: byId('checkpointMeta'),
   runMeta: byId('runMeta'),
   loadCheckpointBtn: byId('loadCheckpoint'),
+  sessionRunSelect: byId('sessionRunSelect'),
+  loadSessionRunBtn: byId('loadSessionRun'),
+  sessionRunMeta: byId('sessionRunMeta'),
   tokenReportMeta: byId('tokenReportMeta'),
   tokenReportTableBody: byId('tokenReportTable').querySelector('tbody'),
   tokenReportBtn: byId('tokenReportBtn'),
@@ -55,4 +58,5 @@ export const els = {
   runLoadStatus: byId('runLoadStatus'),
   loadRunFromDrawer: byId('loadRunFromDrawer'),
   clearRunDetailBtn: byId('clearRunDetail'),
+  liveRunLogs: byId('liveRunLogs'),
 };

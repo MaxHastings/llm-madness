@@ -4,16 +4,22 @@ import { resetTokens } from './prompt.js';
 import { refreshTokenizerReport, refreshTrainingLogs } from './training.js';
 
 export async function refreshCheckpoints() {
-  const data = await api('/api/checkpoints');
-  els.checkpointSelect.innerHTML = '';
-  data.checkpoints.forEach((ckpt) => {
-    const opt = document.createElement('option');
-    opt.value = ckpt;
-    opt.textContent = ckpt;
-    if (ckpt === data.current) opt.selected = true;
-    els.checkpointSelect.appendChild(opt);
-  });
-  els.runMeta.textContent = data.run_dir;
+  try {
+    const data = await api('/api/checkpoints');
+    els.checkpointSelect.innerHTML = '';
+    data.checkpoints.forEach((ckpt) => {
+      const opt = document.createElement('option');
+      opt.value = ckpt;
+      opt.textContent = ckpt;
+      if (ckpt === data.current) opt.selected = true;
+      els.checkpointSelect.appendChild(opt);
+    });
+    els.runMeta.textContent = data.run_dir;
+    els.checkpointMeta.textContent = data.checkpoints.length ? '' : 'no checkpoints found';
+  } catch (err) {
+    els.checkpointSelect.innerHTML = '';
+    els.checkpointMeta.textContent = 'load a training run to see checkpoints';
+  }
 }
 
 async function loadCheckpoint() {
@@ -33,7 +39,37 @@ export async function loadRunIntoInspector(item) {
   await refreshTrainingLogs();
 }
 
+async function refreshSessionRuns() {
+  const data = await api('/api/runs', { scope: 'all' });
+  const runs = (data.runs || []).filter((run) => run.stage === 'train');
+  runs.sort((a, b) => (a.start_time || '') < (b.start_time || '') ? 1 : -1);
+  els.sessionRunSelect.innerHTML = '';
+  if (!runs.length) {
+    els.sessionRunMeta.textContent = 'no training runs found';
+    return;
+  }
+  const baseName = (path) => {
+    if (!path) return 'unknown';
+    const parts = path.split('/');
+    return parts[parts.length - 1] || path;
+  };
+  runs.forEach((run) => {
+    const opt = document.createElement('option');
+    opt.value = run.run_dir;
+    const label = run.run_id || baseName(run.run_dir) || 'unknown';
+    opt.textContent = `${label} (${run.status || 'unknown'})`;
+    els.sessionRunSelect.appendChild(opt);
+  });
+  els.sessionRunMeta.textContent = `${runs.length} training runs`;
+}
+
 export function initSession() {
   els.loadCheckpointBtn.addEventListener('click', loadCheckpoint);
+  els.loadSessionRunBtn.addEventListener('click', async () => {
+    const runDir = els.sessionRunSelect.value;
+    if (!runDir) return;
+    await loadRunIntoInspector({ run_dir: runDir });
+  });
   refreshCheckpoints();
+  refreshSessionRuns();
 }

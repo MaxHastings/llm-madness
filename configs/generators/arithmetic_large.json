@@ -2,7 +2,7 @@
   "seed": 1234,
   "count": 200000,
   "min_value": 0,
-  "max_value": 999,
+  "max_value": 99,
   "addition": true,
   "subtraction": true,
   "allow_negative": false
