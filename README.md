@@ -32,7 +32,7 @@ A lightweight, end-to-end text LLM pipeline with clear stages and timestamped ru
 python -m scripts.train_tokenizer --config configs/tokenizer/default__v001.json --input data/raw/your_data.txt
 
 # 2) train model
-python -m scripts.train_model --config configs/training.json --data data/raw/your_data.txt --tokenizer runs/tokenizer/latest/tokenizer.json
+python -m scripts.train_model --config configs/training/default__v001.json --data data/raw/your_data.txt --tokenizer runs/tokenizer/latest/tokenizer.json
 
 # 3) launch inspector
 python -m scripts.web_ui

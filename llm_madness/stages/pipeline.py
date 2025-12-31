@@ -64,7 +64,7 @@ def run_pipeline(config: dict, repo_root: Path) -> dict:
             _log_event(log_path, {"stage": "tokenizer", "status": "complete", "run_dir": str(result["run_dir"])})
 
         if train_cfg.get("enabled", True):
-            training_config_path = train_cfg.get("config", "configs/training.json")
+            training_config_path = train_cfg.get("config", "configs/training/default__v001.json")
             training_config = load_config(Path(training_config_path))
             data_path = train_cfg.get("data")
             tokenizer_path_cfg = train_cfg.get("tokenizer")

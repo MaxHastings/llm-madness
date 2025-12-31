@@ -9,7 +9,7 @@
   },
   "train": {
     "enabled": true,
-    "config": "configs/training.json",
+    "config": "configs/training/default__v001.json",
     "data": null,
     "tokenizer": null,
     "output_dir": "runs/train"

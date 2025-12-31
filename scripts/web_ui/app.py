@@ -147,6 +147,7 @@ def describe_config(path: Path) -> dict:
     except json.JSONDecodeError:
         payload = {}
     meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
+    model = payload.get("model", {}) if isinstance(payload, dict) else {}
     return {
         "name": meta.get("name") or path.stem,
         "version": meta.get("version"),
@@ -155,6 +156,10 @@ def describe_config(path: Path) -> dict:
         "path": rel,
         "vocab_size": payload.get("vocab_size") if isinstance(payload, dict) else None,
         "algorithm": payload.get("algorithm") if isinstance(payload, dict) else None,
+        "block_size": model.get("block_size"),
+        "n_layer": model.get("n_layer"),
+        "n_head": model.get("n_head"),
+        "n_embd": model.get("n_embd"),
     }
 
 

@@ -16,7 +16,7 @@ from llm_madness.utils import find_latest_run
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train a small GPT model.")
-    parser.add_argument("--config", type=Path, default=Path("configs/training.json"))
+    parser.add_argument("--config", type=Path, default=Path("configs/training/default__v001.json"))
     parser.add_argument("--data", type=Path, default=None)
     parser.add_argument("--dataset-manifest", type=Path, default=None)
     parser.add_argument("--tokenizer", type=Path, default=None)

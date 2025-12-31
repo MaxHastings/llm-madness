@@ -8,6 +8,7 @@ import { initInspect } from './modules/inspect.js';
 import { initDatasets } from './modules/datasets.js';
 import { initTokenizerConfigs } from './modules/tokenizer_configs.js';
 import { initTokenizerVocabs } from './modules/tokenizer_vocabs.js';
+import { initTrainingConfigs } from './modules/training_configs.js';
 
 initNav();
 initSession();
@@ -19,3 +20,4 @@ initRuns();
 initDatasets();
 initTokenizerConfigs();
 initTokenizerVocabs();
+initTrainingConfigs();

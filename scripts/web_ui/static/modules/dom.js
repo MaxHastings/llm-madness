@@ -83,4 +83,12 @@ export const els = {
   tokenizerVocabRefreshDatasetsBtn: byId('tokenizerVocabRefreshDatasets'),
   tokenizerVocabCreateBtn: byId('tokenizerVocabCreate'),
   tokenizerVocabMeta: byId('tokenizerVocabMeta'),
+
+  trainingConfigList: byId('trainingConfigList'),
+  trainingConfigEditor: byId('trainingConfigEditor'),
+  trainingConfigMeta: byId('trainingConfigMeta'),
+  trainingConfigNewBtn: byId('trainingConfigNew'),
+  trainingConfigSaveBtn: byId('trainingConfigSave'),
+  trainingConfigDuplicateBtn: byId('trainingConfigDuplicate'),
+  trainingConfigDeleteBtn: byId('trainingConfigDelete'),
 };

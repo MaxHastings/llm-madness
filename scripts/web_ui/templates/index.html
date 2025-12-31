@@ -17,6 +17,7 @@
         <button class="nav-btn active" data-section="tokenizer-configs">Tokenizer Configs</button>
         <button class="nav-btn" data-section="tokenizer-vocabs">Tokenizer Vocabularies</button>
         <button class="nav-btn" data-section="datasets">Datasets</button>
+        <button class="nav-btn" data-section="training-configs">Training Configs</button>
         <button class="nav-btn" data-section="pipeline">Run Setup</button>
         <button class="nav-btn" data-section="runs">Runs</button>
         <button class="nav-btn" data-section="inspector">Inspect</button>
@@ -82,6 +83,34 @@
               <button id="tokenizerVocabCreate" class="primary">Generate Vocab</button>
             </div>
             <div class="meta" id="tokenizerVocabMeta"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" data-section="training-configs">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Training Configs</h2>
+            <p class="meta">Keep every change as a new version.</p>
+          </div>
+          <div class="controls">
+            <button id="trainingConfigNew" class="primary">New</button>
+            <button id="trainingConfigDuplicate">Duplicate</button>
+            <button id="trainingConfigSave" class="primary">Save New Version</button>
+            <button id="trainingConfigDelete">Delete</button>
+          </div>
+        </div>
+        <div class="split">
+          <div class="panel-list">
+            <h3>Versions</h3>
+            <div id="trainingConfigList" class="config-list"></div>
+          </div>
+          <div class="panel-editor">
+            <h3>Config JSON</h3>
+            <textarea id="trainingConfigEditor" spellcheck="false"></textarea>
+            <div class="meta" id="trainingConfigMeta"></div>
           </div>
         </div>
       </div>
