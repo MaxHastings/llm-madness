@@ -1,5 +1,6 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
+import { loadDatasets, setDatasetSelection } from './pipeline.js';
 
 let currentPath = '';
 const selections = new Set();
@@ -113,9 +114,22 @@ async function refreshDatasetManifests() {
     const path = document.createElement('div');
     path.className = 'meta';
     path.textContent = item.manifest_path;
+    const actions = document.createElement('div');
+    actions.className = 'artifact-actions';
+    const useBtn = document.createElement('button');
+    useBtn.textContent = 'Use in Run';
+    useBtn.addEventListener('click', async () => {
+      if (!item.manifest_path) return;
+      await loadDatasets();
+      setDatasetSelection(item.manifest_path);
+      const navBtn = document.querySelector('[data-section="runs"]');
+      if (navBtn) navBtn.click();
+    });
+    actions.appendChild(useBtn);
     row.appendChild(title);
     row.appendChild(meta);
     row.appendChild(path);
+    row.appendChild(actions);
     els.datasetManifestList.appendChild(row);
   });
 }
@@ -146,4 +160,3 @@ export function initDatasets() {
   loadPath(currentPath);
   refreshDatasetManifests();
 }
-

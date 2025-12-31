@@ -1,5 +1,6 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
+import { setPipelineTrainingConfig } from './pipeline.js';
 
 let configs = [];
 let selectedPath = null;
@@ -73,8 +74,7 @@ function renderList() {
     return;
   }
   configs.forEach((item) => {
-    const row = document.createElement('button');
-    row.type = 'button';
+    const row = document.createElement('div');
     row.className = 'config-row';
     row.dataset.path = item.path;
     row.classList.toggle('active', item.path === selectedPath);
@@ -86,6 +86,20 @@ function renderList() {
       <div class="config-row-sub">${formatDate(item.created_at)}</div>
     `;
     row.addEventListener('click', () => loadConfig(item.path));
+    const actions = document.createElement('div');
+    actions.className = 'artifact-actions';
+    const useBtn = document.createElement('button');
+    useBtn.textContent = 'Use in Run';
+    useBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const ok = setPipelineTrainingConfig(item.path);
+      if (ok) {
+        const navBtn = document.querySelector('[data-section="runs"]');
+        if (navBtn) navBtn.click();
+      }
+    });
+    actions.appendChild(useBtn);
+    row.appendChild(actions);
     els.trainingConfigList.appendChild(row);
   });
 }
@@ -225,4 +239,3 @@ export function initTrainingConfigs() {
     }
   });
 }
-

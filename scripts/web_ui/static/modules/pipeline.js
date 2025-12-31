@@ -9,7 +9,7 @@ function formatDatasetLabel(item) {
   return `${name} — ${count}`;
 }
 
-async function loadDatasets() {
+export async function loadDatasets() {
   const data = await fetchJson('/api/datasets');
   const items = data.datasets || [];
   els.datasetSelect.innerHTML = '';
@@ -23,6 +23,18 @@ async function loadDatasets() {
     opt.textContent = formatDatasetLabel(item);
     els.datasetSelect.appendChild(opt);
   });
+}
+
+export function setDatasetSelection(path) {
+  if (!path) return;
+  const exists = Array.from(els.datasetSelect.options).some((opt) => opt.value === path);
+  if (!exists) {
+    const opt = document.createElement('option');
+    opt.value = path;
+    opt.textContent = path.split('/').slice(-2).join('/');
+    els.datasetSelect.appendChild(opt);
+  }
+  els.datasetSelect.value = path;
 }
 
 export async function loadTokenizerVocabs() {
@@ -90,6 +102,21 @@ function parseConfigEditor() {
   } catch (err) {
     return { ok: false, error: err.message };
   }
+}
+
+export function setPipelineTrainingConfig(path) {
+  if (!path) return false;
+  const parsed = parseConfigEditor();
+  if (!parsed.ok) {
+    els.configMeta.textContent = `invalid json: ${parsed.error}`;
+    return false;
+  }
+  const payload = JSON.parse(parsed.raw);
+  payload.train = payload.train || {};
+  payload.train.config = path;
+  els.configEditor.value = JSON.stringify(payload, null, 2);
+  els.configMeta.textContent = `set training config to ${path}`;
+  return true;
 }
 
 async function saveSelectedConfig() {
