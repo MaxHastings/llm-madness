@@ -394,7 +394,7 @@ function renderRunsFromCache() {
 }
 
 export async function refreshRunList() {
-  const data = await api('/api/runs', { scope: 'all' });
+  const data = await api('/api/runs', { scope: 'train' });
   runsCache = data.runs || [];
   updateFilterOptions(runsCache);
   renderRunsFromCache();

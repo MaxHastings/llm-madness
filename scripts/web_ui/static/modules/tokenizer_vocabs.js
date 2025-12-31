@@ -1,6 +1,5 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
-import { loadTokenizerVocabs, setTokenizerVocabSelection } from './run_setup.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -19,10 +18,73 @@ function formatBytes(bytes) {
   return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
 }
 
+let logStream = null;
+
+function setVocabDetails(payload, label) {
+  const raw = payload?.raw || JSON.stringify(payload ?? {}, null, 2);
+  els.tokenizerVocabDetails.value = raw || '';
+  els.tokenizerVocabDetailsMeta.textContent = label || '';
+}
+
+function appendLogLine(line) {
+  const next = `${els.tokenizerVocabLogs.value}${els.tokenizerVocabLogs.value ? '\n' : ''}${line}`;
+  const maxChars = 20000;
+  els.tokenizerVocabLogs.value = next.length > maxChars ? next.slice(-maxChars) : next;
+  els.tokenizerVocabLogs.scrollTop = els.tokenizerVocabLogs.scrollHeight;
+}
+
+function stopLogStream() {
+  if (logStream) {
+    logStream.close();
+    logStream = null;
+  }
+}
+
+function startLogStream(runDir) {
+  if (!runDir) return;
+  stopLogStream();
+  els.tokenizerVocabLogs.value = '';
+  els.tokenizerVocabLogsMeta.textContent = `streaming logs for ${runDir}`;
+  logStream = new EventSource(`/api/run/stream?run_dir=${encodeURIComponent(runDir)}&kind=process`);
+  logStream.onmessage = (event) => {
+    if (event.data) appendLogLine(event.data);
+  };
+  logStream.onerror = () => {
+    els.tokenizerVocabLogsMeta.textContent = 'log stream disconnected';
+    stopLogStream();
+  };
+}
+
+async function viewVocab(runDir) {
+  if (!runDir) return;
+  try {
+    const data = await fetchJson(`/api/tokenizer_vocabs/report?run_dir=${encodeURIComponent(runDir)}`);
+    const payload = {
+      run_dir: data.run_dir,
+      manifest: data.manifest,
+      config: data.config,
+      report: data.report,
+    };
+    setVocabDetails(payload, `loaded ${runDir}`);
+  } catch (err) {
+    setVocabDetails({ raw: '' }, `failed to load vocab: ${err.message}`);
+  }
+}
+
+async function deleteVocab(runDir) {
+  if (!runDir) return;
+  const ok = window.confirm(`Delete tokenizer vocab ${runDir}? This cannot be undone.`);
+  if (!ok) return;
+  await api('/api/run/delete', { run_dir: runDir });
+  setVocabDetails({ raw: '' }, 'vocab deleted');
+  await loadVocabList();
+}
+
 async function loadVocabList() {
   const data = await fetchJson('/api/tokenizer_vocabs');
   const items = data.vocabs || [];
   els.tokenizerVocabList.innerHTML = '';
+  setVocabDetails({ raw: '' }, '');
   if (!items.length) {
     const empty = document.createElement('div');
     empty.className = 'meta';
@@ -45,16 +107,14 @@ async function loadVocabList() {
     details.textContent = `${sizeLabel} • ${item.run_dir}`;
     const actions = document.createElement('div');
     actions.className = 'artifact-actions';
-    const useBtn = document.createElement('button');
-    useBtn.textContent = 'Use in Run';
-    useBtn.addEventListener('click', async () => {
-      if (!item.tokenizer_path) return;
-      await loadTokenizerVocabs();
-      setTokenizerVocabSelection(item.tokenizer_path);
-      const navBtn = document.querySelector('[data-section="runs"]');
-      if (navBtn) navBtn.click();
-    });
-    actions.appendChild(useBtn);
+    const viewBtn = document.createElement('button');
+    viewBtn.textContent = 'View';
+    viewBtn.addEventListener('click', () => viewVocab(item.run_dir));
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => deleteVocab(item.run_dir));
+    actions.appendChild(viewBtn);
+    actions.appendChild(deleteBtn);
     row.appendChild(title);
     row.appendChild(meta);
     row.appendChild(details);
@@ -121,6 +181,7 @@ async function createVocab() {
   });
   if (res.run_id) {
     els.tokenizerVocabMeta.textContent = `started tokenizer run ${res.run_id}`;
+    startLogStream(res.run_dir);
   } else {
     els.tokenizerVocabMeta.textContent = res.error || 'run failed';
   }

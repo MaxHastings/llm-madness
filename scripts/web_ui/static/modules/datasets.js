@@ -1,6 +1,5 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
-import { loadDatasets, setDatasetSelection } from './run_setup.js';
 
 let currentPath = '';
 const selections = new Set();
@@ -21,6 +20,31 @@ function renderSelections() {
   const items = Array.from(selections).sort();
   els.datasetSelections.value = items.join('\n');
   els.datasetMeta.textContent = items.length ? `${items.length} selection(s)` : 'Select files and folders under data/.';
+}
+
+function setManifestPreview(payload, label) {
+  const raw = payload?.raw || JSON.stringify(payload?.manifest ?? {}, null, 2);
+  els.datasetManifestPreview.value = raw || '';
+  els.datasetManifestMeta.textContent = label || '';
+}
+
+async function viewManifest(path) {
+  if (!path) return;
+  try {
+    const data = await fetchJson(`/api/datasets/manifest?path=${encodeURIComponent(path)}`);
+    setManifestPreview(data, `loaded ${data.path || path}`);
+  } catch (err) {
+    setManifestPreview({ raw: '' }, `failed to load manifest: ${err.message}`);
+  }
+}
+
+async function deleteManifest(runDir) {
+  if (!runDir) return;
+  const ok = window.confirm(`Delete dataset manifest ${runDir}? This cannot be undone.`);
+  if (!ok) return;
+  await api('/api/run/delete', { run_dir: runDir });
+  setManifestPreview({ raw: '' }, 'manifest deleted');
+  await refreshDatasetManifests();
 }
 
 function renderEntries(entries, parent) {
@@ -96,6 +120,7 @@ async function refreshDatasetManifests() {
   const data = await fetchJson('/api/datasets');
   const items = data.datasets || [];
   els.datasetManifestList.innerHTML = '';
+  setManifestPreview({ raw: '' }, '');
   if (!items.length) {
     const empty = document.createElement('div');
     empty.className = 'meta';
@@ -116,16 +141,14 @@ async function refreshDatasetManifests() {
     path.textContent = item.manifest_path;
     const actions = document.createElement('div');
     actions.className = 'artifact-actions';
-    const useBtn = document.createElement('button');
-    useBtn.textContent = 'Use in Run';
-    useBtn.addEventListener('click', async () => {
-      if (!item.manifest_path) return;
-      await loadDatasets();
-      setDatasetSelection(item.manifest_path);
-      const navBtn = document.querySelector('[data-section="runs"]');
-      if (navBtn) navBtn.click();
-    });
-    actions.appendChild(useBtn);
+    const viewBtn = document.createElement('button');
+    viewBtn.textContent = 'View';
+    viewBtn.addEventListener('click', () => viewManifest(item.manifest_path));
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => deleteManifest(item.run_dir));
+    actions.appendChild(viewBtn);
+    actions.appendChild(deleteBtn);
     row.appendChild(title);
     row.appendChild(meta);
     row.appendChild(path);

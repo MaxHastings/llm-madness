@@ -1,6 +1,5 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
-import { setTrainingConfigSelection } from './run_setup.js';
 
 let configs = [];
 let selectedPath = null;
@@ -86,18 +85,6 @@ function renderList() {
       <div class="config-row-sub">${formatDate(item.created_at)}</div>
     `;
     row.addEventListener('click', () => loadConfig(item.path));
-    const actions = document.createElement('div');
-    actions.className = 'artifact-actions';
-    const useBtn = document.createElement('button');
-    useBtn.textContent = 'Use in Run';
-    useBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      setTrainingConfigSelection(item.path);
-      const navBtn = document.querySelector('[data-section="runs"]');
-      if (navBtn) navBtn.click();
-    });
-    actions.appendChild(useBtn);
-    row.appendChild(actions);
     els.trainingConfigList.appendChild(row);
   });
 }

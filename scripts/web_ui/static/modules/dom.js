@@ -57,6 +57,8 @@ export const els = {
   datasetCreateMeta: byId('datasetCreateMeta'),
   datasetManifestList: byId('datasetManifestList'),
   datasetRefreshManifestsBtn: byId('datasetRefreshManifests'),
+  datasetManifestPreview: byId('datasetManifestPreview'),
+  datasetManifestMeta: byId('datasetManifestMeta'),
 
   datasetSelect: byId('datasetSelect'),
   refreshDatasetsBtn: byId('refreshDatasets'),
@@ -83,6 +85,10 @@ export const els = {
   tokenizerVocabRefreshDatasetsBtn: byId('tokenizerVocabRefreshDatasets'),
   tokenizerVocabCreateBtn: byId('tokenizerVocabCreate'),
   tokenizerVocabMeta: byId('tokenizerVocabMeta'),
+  tokenizerVocabDetails: byId('tokenizerVocabDetails'),
+  tokenizerVocabDetailsMeta: byId('tokenizerVocabDetailsMeta'),
+  tokenizerVocabLogs: byId('tokenizerVocabLogs'),
+  tokenizerVocabLogsMeta: byId('tokenizerVocabLogsMeta'),
 
   trainingConfigList: byId('trainingConfigList'),
   trainingConfigEditor: byId('trainingConfigEditor'),

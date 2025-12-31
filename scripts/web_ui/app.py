@@ -311,9 +311,31 @@ class Handler(BaseHTTPRequestHandler):
                             "total_bytes": manifest.get("total_bytes"),
                             "manifest_path": str(manifest_path),
                             "snapshot_path": manifest.get("snapshot_path"),
+                            "run_dir": str(run_dir),
                         }
                     )
             self._send_json({"datasets": datasets})
+            return
+        if self.path.startswith("/api/datasets/manifest"):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            path = params.get("path", [""])[0]
+            if not path:
+                self._send_json({"error": "path required"}, status=400)
+                return
+            target = Path(unquote(path)).resolve()
+            if RUNS_ROOT.resolve() not in target.parents:
+                self._send_json({"error": "invalid manifest path"}, status=400)
+                return
+            if not target.exists() or not target.is_file():
+                self._send_json({"error": "manifest not found"}, status=404)
+                return
+            raw = target.read_text()
+            try:
+                parsed_manifest = json.loads(raw)
+            except json.JSONDecodeError:
+                parsed_manifest = None
+            self._send_json({"path": str(target), "raw": raw, "manifest": parsed_manifest})
             return
         if self.path == "/api/tokenizer_vocabs":
             vocabs = []
@@ -361,6 +383,50 @@ class Handler(BaseHTTPRequestHandler):
                         }
                     )
             self._send_json({"vocabs": vocabs})
+            return
+        if self.path.startswith("/api/tokenizer_vocabs/report"):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            run_dir = params.get("run_dir", [""])[0]
+            if not run_dir:
+                self._send_json({"error": "run_dir required"}, status=400)
+                return
+            run_path = Path(unquote(run_dir)).resolve()
+            if RUNS_ROOT.resolve() not in run_path.parents:
+                self._send_json({"error": "invalid run path"}, status=400)
+                return
+            if not run_path.exists() or not run_path.is_dir():
+                self._send_json({"error": "run not found"}, status=404)
+                return
+            manifest = None
+            report = None
+            config = None
+            manifest_path = run_path / "run.json"
+            report_path = run_path / "report.json"
+            config_path = run_path / "tokenizer_config.json"
+            if manifest_path.exists():
+                try:
+                    manifest = json.loads(manifest_path.read_text())
+                except json.JSONDecodeError:
+                    manifest = None
+            if report_path.exists():
+                try:
+                    report = json.loads(report_path.read_text())
+                except json.JSONDecodeError:
+                    report = None
+            if config_path.exists():
+                try:
+                    config = json.loads(config_path.read_text())
+                except json.JSONDecodeError:
+                    config = None
+            self._send_json(
+                {
+                    "run_dir": str(run_path),
+                    "manifest": manifest,
+                    "report": report,
+                    "config": config,
+                }
+            )
             return
         if self.path.startswith("/api/run/stream"):
             parsed = urlparse(self.path)
@@ -699,6 +765,22 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/runs":
                 payload = self._read_json()
                 scope = payload.get("scope", "train") if isinstance(payload, dict) else "train"
+                if scope == "train":
+                    summaries = []
+                    run_dirs: set[Path] = set()
+                    train_root = RUNS_ROOT / "train"
+                    if train_root.exists():
+                        for run_dir in sorted(train_root.iterdir()):
+                            if run_dir.is_dir():
+                                run_dirs.add(run_dir)
+                    for info in RUN_PROCS.values():
+                        if info.get("stage") == "train":
+                            run_dirs.add(Path(info["run_dir"]))
+                    for run_dir in sorted(run_dirs):
+                        summaries.append(build_run_summary(run_dir))
+                    summaries.sort(key=lambda item: item.get("start_time") or item.get("run_id") or "", reverse=True)
+                    self._send_json({"runs": summaries})
+                    return
                 if scope == "all":
                     summaries = []
                     run_dirs: set[Path] = set()
