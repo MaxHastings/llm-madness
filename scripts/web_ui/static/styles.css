@@ -360,6 +360,12 @@ button.token-btn:hover {
   gap: 10px;
 }
 
+.run-item.selected {
+  border-color: var(--accent-2);
+  background: #fff3e4;
+  box-shadow: 0 10px 20px rgba(145, 94, 38, 0.08);
+}
+
 .run-item button {
   border-radius: 999px;
 }
@@ -537,6 +543,16 @@ button.token-btn:hover {
   font-family: var(--mono);
   font-size: 11px;
   white-space: pre-wrap;
+}
+
+#runsSearch {
+  min-width: 160px;
+}
+
+.runs-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .inspect-grid {

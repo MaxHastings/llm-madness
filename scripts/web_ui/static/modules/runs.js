@@ -82,12 +82,28 @@ function updateFilterOptions(items) {
 function applyRunFilters(items) {
   const stageFilter = els.runsFilterStage.value;
   const statusFilter = els.runsFilterStatus.value;
+  const searchTerm = (els.runsSearch.value || '').trim().toLowerCase();
   let filtered = items.slice();
   if (stageFilter && stageFilter !== 'all') {
     filtered = filtered.filter((row) => row.stage === stageFilter);
   }
   if (statusFilter && statusFilter !== 'all') {
     filtered = filtered.filter((row) => row.status === statusFilter);
+  }
+  if (searchTerm) {
+    filtered = filtered.filter((row) => {
+      const haystack = [
+        row.run_id,
+        row.run_dir,
+        row.stage,
+        row.status,
+        row.last_log,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(searchTerm);
+    });
   }
   const sortOrder = els.runsSort.value || 'newest';
   filtered.sort((a, b) => {
@@ -102,6 +118,10 @@ function applyRunFilters(items) {
 function renderRunRow(item) {
   const row = document.createElement('div');
   row.className = 'run-item';
+  if (selectedRun && selectedRun.run_dir === item.run_dir) {
+    row.classList.add('selected');
+  }
+  row.dataset.runDir = item.run_dir;
 
   const main = document.createElement('div');
   main.className = 'run-main';
@@ -188,6 +208,10 @@ function renderRunRow(item) {
 
   row.appendChild(main);
   row.appendChild(actions);
+  row.addEventListener('click', (event) => {
+    if (event.target.closest('button')) return;
+    showRunDetails(item.run_dir);
+  });
   return row;
 }
 
@@ -291,6 +315,9 @@ async function showRunDetails(runDir) {
     process_log: data.process_log || [],
   };
   autoRefreshEnabled = false;
+  if (els.runsAutoRefresh) {
+    els.runsAutoRefresh.checked = false;
+  }
   liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
   els.runDetailMeta.textContent = selectedRun ? `${selectedRun.stage} | ${selectedRun.run_id}` : 'Run detail';
   els.runLoadStatus.textContent = 'Auto-refresh paused while viewing this run.';
@@ -378,6 +405,9 @@ function clearRunDetail() {
   els.runLogs.textContent = '';
   els.loadRunFromDrawer.disabled = true;
   autoRefreshEnabled = true;
+  if (els.runsAutoRefresh) {
+    els.runsAutoRefresh.checked = true;
+  }
   liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
   stopLogStream();
 }
@@ -388,9 +418,12 @@ function renderRunsFromCache() {
   const historyRuns = filtered.filter((row) => !activeRuns.includes(row));
   renderRunSection(els.runsActiveList, activeRuns);
   renderRunSection(els.runsHistoryList, historyRuns);
-  const activeCount = runsCache.filter((row) => row.is_active || row.status === 'running' || row.status === 'queued').length;
+  const activeCount = activeRuns.length;
+  const filteredCount = filtered.length;
+  const totalCount = runsCache.length;
+  const countLabel = filteredCount === totalCount ? `${totalCount} runs` : `${filteredCount} of ${totalCount} runs`;
   const pauseNote = autoRefreshEnabled ? '' : ' | auto-refresh paused';
-  els.runsMeta.textContent = `${runsCache.length} runs | ${activeCount} active${pauseNote}`;
+  els.runsMeta.textContent = `${countLabel} | ${activeCount} active${pauseNote}`;
 }
 
 export async function refreshRunList() {
@@ -402,9 +435,14 @@ export async function refreshRunList() {
 
 export function initRuns() {
   els.refreshRunsBtn.addEventListener('click', refreshRunList);
+  els.runsSearch.addEventListener('input', renderRunsFromCache);
   els.runsFilterStage.addEventListener('change', renderRunsFromCache);
   els.runsFilterStatus.addEventListener('change', renderRunsFromCache);
   els.runsSort.addEventListener('change', renderRunsFromCache);
+  els.runsAutoRefresh.addEventListener('change', () => {
+    autoRefreshEnabled = els.runsAutoRefresh.checked;
+    renderRunsFromCache();
+  });
   els.liveRunLogs.addEventListener('change', () => {
     liveLogsEnabled = els.liveRunLogs.checked;
     if (liveLogsEnabled) {
