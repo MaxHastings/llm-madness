@@ -142,34 +142,36 @@
         </div>
       </div>
       <div class="panel runs-workspace">
-        <div class="panel-head">
-          <div>
-            <h2>Runs Workspace</h2>
-            <p class="meta" id="runsMeta"></p>
+        <aside class="runs-sidebar">
+          <div class="panel-head">
+            <div>
+              <h2>Runs Workspace</h2>
+              <p class="meta" id="runsMeta"></p>
+            </div>
+            <div class="controls">
+              <button id="refreshRuns" class="primary">Refresh</button>
+              <input id="runsSearch" placeholder="Search runs" />
+              <select id="runsFilterStage"></select>
+              <select id="runsFilterStatus"></select>
+              <select id="runsSort"></select>
+              <label class="meta runs-toggle">
+                <input type="checkbox" id="runsAutoRefresh" checked />
+                Auto refresh
+              </label>
+            </div>
           </div>
-          <div class="controls">
-            <button id="refreshRuns" class="primary">Refresh</button>
-            <input id="runsSearch" placeholder="Search runs" />
-            <select id="runsFilterStage"></select>
-            <select id="runsFilterStatus"></select>
-            <select id="runsSort"></select>
-            <label class="meta runs-toggle">
-              <input type="checkbox" id="runsAutoRefresh" checked />
-              Auto refresh
-            </label>
-          </div>
-        </div>
-        <div class="runs-body">
           <div class="runs-columns">
-            <div class="runs-section">
-              <h3>Active</h3>
+            <details class="runs-section" open>
+              <summary>Active</summary>
               <div id="runsActiveList" class="runs-list"></div>
-            </div>
-            <div class="runs-section">
-              <h3>History</h3>
+            </details>
+            <details class="runs-section">
+              <summary>History</summary>
               <div id="runsHistoryList" class="runs-list"></div>
-            </div>
+            </details>
           </div>
+        </aside>
+        <section class="runs-inspector">
           <div class="run-drawer" id="runDrawer">
             <div class="drawer-head">
               <div>
@@ -216,7 +218,7 @@
             </div>
             <pre id="runLogs" class="run-detail"></pre>
           </div>
-        </div>
+        </section>
       </div>
     </section>
 

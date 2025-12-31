@@ -358,6 +358,7 @@ button.token-btn:hover {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
+  min-width: 0;
 }
 
 .run-item.selected {
@@ -380,6 +381,7 @@ button.token-btn:hover {
 .run-main {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .run-top {
@@ -387,6 +389,7 @@ button.token-btn:hover {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 
 .run-bottom {
@@ -395,6 +398,7 @@ button.token-btn:hover {
   gap: 10px;
   align-items: center;
   font-size: 11px;
+  min-width: 0;
 }
 
 .run-stage {
@@ -448,10 +452,48 @@ button.token-btn:hover {
   white-space: nowrap;
 }
 
-.runs-workspace .runs-body {
+.runs-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
   gap: 16px;
+  align-items: start;
+}
+
+.runs-sidebar {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.runs-inspector {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}
+
+.runs-sidebar .panel-head {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.runs-sidebar .controls {
+  display: grid;
+  gap: 8px;
+}
+
+.runs-sidebar .controls > * {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.runs-sidebar #runsSearch {
+  min-width: 0;
 }
 
 .runs-columns {
@@ -459,18 +501,30 @@ button.token-btn:hover {
   gap: 12px;
 }
 
-.runs-section h3 {
-  margin: 6px 0 8px;
+.runs-section {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: #fffdfa;
+  padding: 8px 10px;
+}
+
+.runs-section summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a4139;
+  margin-bottom: 8px;
 }
 
 .run-drawer {
-  border: 1px dashed var(--border);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px;
   background: #fffdfa;
   display: grid;
   gap: 10px;
   align-content: start;
+  min-width: 0;
 }
 
 .drawer-head {
@@ -587,7 +641,7 @@ button.token-btn:hover {
 }
 
 .run-loss-chart {
-  height: 140px;
+  height: 260px;
 }
 
 #runsSearch {
@@ -668,7 +722,13 @@ button.token-btn:hover {
     align-items: flex-start;
   }
 
-  .runs-workspace .runs-body {
+  .runs-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1200px) {
+  .runs-workspace {
     grid-template-columns: 1fr;
   }
 }
