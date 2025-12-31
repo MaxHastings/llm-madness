@@ -107,6 +107,7 @@ function newConfigTemplate() {
       created_at: new Date().toISOString().slice(0, 19),
       parent_id: null,
     },
+    algorithm: 'bpe',
     vocab_size: 4096,
     min_frequency: 2,
     special_tokens: ['<|unk|>', '<|begin|>', '<|end|>', '<|endoftext|>'],
@@ -196,4 +197,3 @@ export function initTokenizerConfigs() {
     }
   });
 }
-

@@ -6,6 +6,9 @@
 !/runs/.gitkeep
 !/runs/**/.gitkeep
 
+# tokenizer configs (user-specific)
+/configs/tokenizer/**
+
 # user-owned scripts (keep folder, ignore contents)
 /user_scripts/**
 !/user_scripts/.gitkeep
