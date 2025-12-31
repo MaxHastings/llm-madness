@@ -12,10 +12,64 @@
       <h1>LLM Madness Inspector</h1>
       <p class="subtitle">Decode how your model sees text and why it predicts what it does.</p>
     </div>
-    <div class="meta" id="runMeta">Loading run...</div>
+    <nav class="main-nav">
+      <button class="nav-btn active" data-section="runs">Runs</button>
+      <button class="nav-btn" data-section="pipeline">Pipeline</button>
+      <button class="nav-btn" data-section="inspector">Inspector</button>
+      <button class="nav-btn" data-section="training">Training</button>
+    </nav>
   </header>
   <main>
-    <section class="grid">
+    <section class="page-section active" data-section="runs">
+      <div class="panel runs-workspace">
+        <div class="panel-head">
+          <div>
+            <h2>Runs Workspace</h2>
+            <p class="meta" id="runsMeta"></p>
+          </div>
+          <div class="controls">
+            <button id="refreshRuns" class="primary">Refresh</button>
+            <select id="runsFilterStage"></select>
+            <select id="runsFilterStatus"></select>
+            <select id="runsSort"></select>
+          </div>
+        </div>
+        <div class="runs-body">
+          <div class="runs-columns">
+            <div class="runs-section">
+              <h3>Active</h3>
+              <div id="runsActiveList" class="runs-list"></div>
+            </div>
+            <div class="runs-section">
+              <h3>History</h3>
+              <div id="runsHistoryList" class="runs-list"></div>
+            </div>
+          </div>
+          <div class="run-drawer" id="runDrawer">
+            <div class="drawer-head">
+              <div>
+                <h3>Inspector Target</h3>
+                <div class="meta" id="runDetailMeta">Select a run to inspect.</div>
+              </div>
+              <div class="drawer-actions">
+                <button id="loadRunFromDrawer" class="primary" disabled>Load into Inspector</button>
+                <button id="clearRunDetail">Clear</button>
+              </div>
+            </div>
+            <div class="meta" id="runLoadStatus"></div>
+            <div class="run-summary" id="runSummary"></div>
+            <div class="run-manifest" id="runManifest"></div>
+            <div class="run-tabs">
+              <button class="tab active" data-tab="logs">logs.jsonl</button>
+              <button class="tab" data-tab="process">process.log</button>
+            </div>
+            <pre id="runLogs" class="run-detail"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" data-section="pipeline">
       <div class="panel">
         <h2>Pipeline Control</h2>
         <div class="controls">
@@ -32,131 +86,122 @@
         </div>
         <textarea id="configEditor" placeholder="Select a config to edit..." spellcheck="false"></textarea>
       </div>
+    </section>
+    <section class="page-section" data-section="inspector">
       <div class="panel">
-        <h2>Runs</h2>
+        <h2>Model Session</h2>
         <div class="controls">
-          <button id="refreshRuns" class="primary">Refresh</button>
-          <span class="meta" id="runsMeta"></span>
+          <span class="meta" id="runMeta">Loading run...</span>
         </div>
-        <div id="runsList" class="runs-list"></div>
-        <div class="meta" id="runDetailMeta"></div>
-        <pre id="runDetail" class="run-detail"></pre>
-      </div>
-    </section>
-    <section class="panel">
-      <h2>Run</h2>
-      <div class="controls">
-        <select id="runSelect"></select>
-        <button id="loadRun" class="primary">Load Run</button>
-        <span class="meta" id="runStatus"></span>
-      </div>
-      <h2>Checkpoint</h2>
-      <div class="controls">
-        <select id="checkpointSelect"></select>
-        <button id="loadCheckpoint" class="primary">Load</button>
-        <span class="meta" id="checkpointMeta"></span>
-      </div>
-    </section>
-
-    <section class="grid">
-      <div class="panel">
-        <h2>Prompt</h2>
         <div class="controls">
-          <button id="tokenizeBtn" class="primary">Tokenize</button>
-          <button id="decodeBtn">Decode</button>
+          <select id="checkpointSelect"></select>
+          <button id="loadCheckpoint" class="primary">Load</button>
+          <span class="meta" id="checkpointMeta"></span>
         </div>
-        <textarea id="promptInput" placeholder="Type a prompt..." spellcheck="false"></textarea>
-        <div class="meta" id="promptMeta"></div>
       </div>
-      <div class="panel">
-        <h2>Tokens</h2>
-        <div id="tokenList" class="token-list"></div>
-      </div>
-    </section>
 
-    <section class="panel">
-      <h2>Next Token (Top-k)</h2>
-      <div class="controls">
-        <label>Top-k <input id="topK" type="number" value="8" min="1" max="50" /></label>
-        <button id="nextBtn" class="primary">Probe</button>
-        <span class="meta">Click a token to append it to the prompt.</span>
+      <div class="grid">
+        <div class="panel">
+          <h2>Prompt</h2>
+          <div class="controls">
+            <button id="tokenizeBtn" class="primary">Tokenize</button>
+            <button id="decodeBtn">Decode</button>
+          </div>
+          <textarea id="promptInput" placeholder="Type a prompt..." spellcheck="false"></textarea>
+          <div class="meta" id="promptMeta"></div>
+        </div>
+        <div class="panel">
+          <h2>Tokens</h2>
+          <div id="tokenList" class="token-list"></div>
+        </div>
       </div>
-      <div id="nextMeta" class="meta"></div>
-      <table id="nextTable">
-        <thead>
-          <tr><th>Rank</th><th>Token</th><th>ID</th><th>Prob</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
 
-    <section class="grid">
       <div class="panel">
-        <h2>Tokenizer Report</h2>
+        <h2>Next Token (Top-k)</h2>
         <div class="controls">
-          <button id="tokenReportBtn" class="primary">Refresh</button>
+          <label>Top-k <input id="topK" type="number" value="8" min="1" max="50" /></label>
+          <button id="nextBtn" class="primary">Probe</button>
+          <span class="meta">Click a token to append it to the prompt.</span>
         </div>
-        <div id="tokenReportMeta" class="meta"></div>
-        <table id="tokenReportTable">
+        <div id="nextMeta" class="meta"></div>
+        <table id="nextTable">
           <thead>
-            <tr><th>Token</th><th>ID</th><th>Count</th></tr>
+            <tr><th>Rank</th><th>Token</th><th>ID</th><th>Prob</th></tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <div class="panel">
-        <h2>Training Diagnostics</h2>
-        <div class="controls">
-          <button id="refreshLogs" class="primary">Refresh</button>
-        </div>
-        <div id="lossChart" class="chart"></div>
-        <div class="meta" id="lossMeta"></div>
-        <h3>Samples</h3>
-        <div id="sampleList" class="samples"></div>
-      </div>
-    </section>
 
-    <section class="panel">
-      <h2>Introspection</h2>
-      <div class="controls">
-        <label>Layer <input id="inspectLayer" type="number" value="0" min="0" /></label>
-        <label>Head <input id="inspectHead" type="number" value="0" min="0" /></label>
-        <select id="inspectMode">
-          <option value="attention">Attention</option>
-          <option value="mlp">MLP (top activations)</option>
-          <option value="layer_topk">Layer Top-K</option>
-        </select>
-        <button id="inspectBtn" class="primary">Inspect</button>
-      </div>
-      <div id="inspectMeta" class="meta"></div>
-      <div class="inspect-grid">
-        <div>
-          <canvas id="inspectHeatmap" class="heatmap"></canvas>
-          <div class="meta" id="inspectLegend"></div>
+      <div class="panel">
+        <h2>Introspection</h2>
+        <div class="controls">
+          <label>Layer <input id="inspectLayer" type="number" value="0" min="0" /></label>
+          <label>Head <input id="inspectHead" type="number" value="0" min="0" /></label>
+          <select id="inspectMode">
+            <option value="attention">Attention</option>
+            <option value="mlp">MLP (top activations)</option>
+            <option value="layer_topk">Layer Top-K</option>
+          </select>
+          <button id="inspectBtn" class="primary">Inspect</button>
         </div>
-        <div>
-          <h3>Tokens</h3>
-          <div id="inspectTokens" class="token-list"></div>
-          <div id="layerTopkWrap">
-            <h3>Layer Top-K</h3>
-            <table id="layerTopkTable">
+        <div id="inspectMeta" class="meta"></div>
+        <div class="inspect-grid">
+          <div>
+            <canvas id="inspectHeatmap" class="heatmap"></canvas>
+            <div class="meta" id="inspectLegend"></div>
+          </div>
+          <div>
+            <h3>Tokens</h3>
+            <div id="inspectTokens" class="token-list"></div>
+            <div id="layerTopkWrap">
+              <h3>Layer Top-K</h3>
+              <table id="layerTopkTable">
+                <thead>
+                  <tr><th>Layer</th><th>Top-K tokens</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <table id="inspectTable">
               <thead>
-                <tr><th>Layer</th><th>Top-K tokens</th></tr>
+                <tr><th>Index</th><th>Value</th></tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
-          <table id="inspectTable">
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" data-section="training">
+      <div class="grid">
+        <div class="panel">
+          <h2>Tokenizer Report</h2>
+          <div class="controls">
+            <button id="tokenReportBtn" class="primary">Refresh</button>
+          </div>
+          <div id="tokenReportMeta" class="meta"></div>
+          <table id="tokenReportTable">
             <thead>
-              <tr><th>Index</th><th>Value</th></tr>
+              <tr><th>Token</th><th>ID</th><th>Count</th></tr>
             </thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div class="panel">
+          <h2>Training Diagnostics</h2>
+          <div class="controls">
+            <button id="refreshLogs" class="primary">Refresh</button>
+          </div>
+          <div id="lossChart" class="chart"></div>
+          <div class="meta" id="lossMeta"></div>
+          <h3>Samples</h3>
+          <div id="sampleList" class="samples"></div>
         </div>
       </div>
     </section>
   </main>
 
-  <script src="/static/app.js"></script>
+  <script type="module" src="/static/app.js"></script>
 </body>
 </html>

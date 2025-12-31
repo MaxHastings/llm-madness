@@ -4,7 +4,7 @@
   "generate": {
     "enabled": true,
     "generator": "arithmetic",
-    "config": "configs/generators/arithmetic_small.json",
+    "config": "configs/generators/arithmetic_large.json",
     "output_dir": "data/generated"
   },
   "combine": {

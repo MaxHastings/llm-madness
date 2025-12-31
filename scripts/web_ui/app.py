@@ -5,6 +5,7 @@ import argparse
 import json
 import subprocess
 import sys
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
@@ -40,6 +41,122 @@ def guess_mime(path: Path) -> str:
     if suffix == ".png":
         return "image/png"
     return "text/plain"
+
+
+def parse_iso(ts: str | None) -> datetime | None:
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts)
+    except ValueError:
+        return None
+
+
+def format_duration(seconds: float | None) -> str | None:
+    if seconds is None or seconds < 0:
+        return None
+    total = int(seconds)
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    if hours:
+        return f"{hours}h {minutes}m {secs}s"
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
+
+
+def read_last_line(path: Path) -> str | None:
+    if not path.exists() or not path.is_file():
+        return None
+    with path.open("rb") as handle:
+        handle.seek(0, 2)
+        size = handle.tell()
+        if size == 0:
+            return None
+        read_size = min(size, 4096)
+        handle.seek(-read_size, 2)
+        chunk = handle.read(read_size)
+    lines = chunk.splitlines()
+    if not lines:
+        return None
+    last = lines[-1].decode("utf-8", errors="ignore").strip()
+    return last or None
+
+
+def normalize_status(status: str | None) -> str:
+    if not status:
+        return "unknown"
+    lowered = status.lower()
+    if lowered in {"complete", "completed", "success", "succeeded", "finished"}:
+        return "completed"
+    if lowered in {"running", "active", "in_progress"}:
+        return "running"
+    if lowered in {"queued", "pending"}:
+        return "queued"
+    if lowered in {"stopped", "cancelled", "canceled"}:
+        return "stopped"
+    if lowered in {"failed", "error"}:
+        return "failed"
+    return lowered
+
+
+def infer_stage(run_dir: Path, manifest: dict | None) -> str:
+    if manifest and manifest.get("stage"):
+        return manifest["stage"]
+    stage = run_dir.parent.name
+    mapping = {"generated": "generate", "combined": "combine"}
+    return mapping.get(stage, stage or "unknown")
+
+
+def run_is_active(run_id: str) -> bool:
+    info = RUN_PROCS.get(run_id)
+    if not info:
+        return False
+    return info["process"].poll() is None
+
+
+def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
+    run_id = run_dir.name
+    manifest_path = run_dir / "run.json"
+    has_manifest = manifest is not None or manifest_path.exists()
+    if manifest is None and has_manifest:
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except json.JSONDecodeError:
+            manifest = None
+    stage = infer_stage(run_dir, manifest)
+    is_active = run_is_active(run_id)
+    status = normalize_status(manifest.get("status") if manifest else None)
+    if is_active:
+        status = "running"
+    start_time = manifest.get("start_time") if manifest else None
+    end_time = manifest.get("end_time") if manifest else None
+    start_dt = parse_iso(start_time)
+    end_dt = parse_iso(end_time)
+    if start_dt:
+        if is_active:
+            duration_seconds = (datetime.now() - start_dt).total_seconds()
+        elif end_dt:
+            duration_seconds = (end_dt - start_dt).total_seconds()
+        else:
+            duration_seconds = None
+    else:
+        duration_seconds = None
+    duration = format_duration(duration_seconds)
+    last_log = read_last_line(run_dir / "logs.jsonl") or read_last_line(run_dir / "process.log")
+    return {
+        "run_id": run_id,
+        "run_dir": str(run_dir),
+        "stage": stage,
+        "status": status,
+        "start_time": start_time,
+        "end_time": end_time,
+        "duration": duration,
+        "last_log": last_log,
+        "has_manifest": has_manifest,
+        "is_active": is_active,
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -98,14 +215,20 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 manifest_path = run_path / "run.json"
                 payload = {"run_dir": str(run_path)}
+                manifest = None
                 if manifest_path.exists():
-                    payload["manifest"] = json.loads(manifest_path.read_text())
+                    try:
+                        manifest = json.loads(manifest_path.read_text())
+                    except json.JSONDecodeError:
+                        manifest = None
+                    payload["manifest"] = manifest
                 logs_path = run_path / "logs.jsonl"
                 if logs_path.exists():
                     payload["logs"] = logs_path.read_text().splitlines()[-200:]
                 proc_log = run_path / "process.log"
                 if proc_log.exists():
                     payload["process_log"] = proc_log.read_text().splitlines()[-200:]
+                payload["summary"] = build_run_summary(run_path, manifest)
                 self._send_json(payload)
                 return
             self._send_json({"error": "run not found"}, status=404)
@@ -238,6 +361,7 @@ class Handler(BaseHTTPRequestHandler):
                 if run_id in RUN_PROCS and RUN_PROCS[run_id]["process"].poll() is None:
                     self._send_json({"error": "run is still active; stop it first"}, status=400)
                     return
+                RUN_PROCS.pop(run_id, None)
                 if not run_path.exists():
                     self._send_json({"error": "run not found"}, status=404)
                     return
@@ -253,26 +377,19 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self._read_json()
                 scope = payload.get("scope", "train") if isinstance(payload, dict) else "train"
                 if scope == "all":
-                    manifests = []
+                    summaries = []
+                    run_dirs: set[Path] = set()
                     for root in (RUNS_ROOT, DATA_ROOT):
                         if not root.exists():
                             continue
                         for path in root.rglob("run.json"):
-                            run_dir = path.parent
-                            try:
-                                manifest = json.loads(path.read_text())
-                            except json.JSONDecodeError:
-                                continue
-                            manifests.append(
-                                {
-                                    "run_dir": str(run_dir),
-                                    "stage": manifest.get("stage"),
-                                    "status": manifest.get("status"),
-                                    "start_time": manifest.get("start_time"),
-                                }
-                            )
-                    manifests.sort(key=lambda item: item.get("start_time") or "", reverse=True)
-                    self._send_json({"runs": manifests})
+                            run_dirs.add(path.parent)
+                    for info in RUN_PROCS.values():
+                        run_dirs.add(Path(info["run_dir"]))
+                    for run_dir in sorted(run_dirs):
+                        summaries.append(build_run_summary(run_dir))
+                    summaries.sort(key=lambda item: item.get("start_time") or item.get("run_id") or "", reverse=True)
+                    self._send_json({"runs": summaries})
                     return
                 runs = []
                 if RUNS_DIR.exists():
