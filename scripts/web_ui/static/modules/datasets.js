@@ -1,6 +1,6 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
-import { loadDatasets, setDatasetSelection } from './pipeline.js';
+import { loadDatasets, setDatasetSelection } from './run_setup.js';
 
 let currentPath = '';
 const selections = new Set();

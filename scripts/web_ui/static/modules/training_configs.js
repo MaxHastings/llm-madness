@@ -1,6 +1,6 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
-import { setPipelineTrainingConfig } from './pipeline.js';
+import { setTrainingConfigSelection } from './run_setup.js';
 
 let configs = [];
 let selectedPath = null;
@@ -92,11 +92,9 @@ function renderList() {
     useBtn.textContent = 'Use in Run';
     useBtn.addEventListener('click', (event) => {
       event.stopPropagation();
-      const ok = setPipelineTrainingConfig(item.path);
-      if (ok) {
-        const navBtn = document.querySelector('[data-section="runs"]');
-        if (navBtn) navBtn.click();
-      }
+      setTrainingConfigSelection(item.path);
+      const navBtn = document.querySelector('[data-section="runs"]');
+      if (navBtn) navBtn.click();
     });
     actions.appendChild(useBtn);
     row.appendChild(actions);

@@ -29,14 +29,8 @@ export const els = {
   layerTopkTableBody: byId('layerTopkTable').querySelector('tbody'),
   inspectTopK: byId('inspectTopK'),
   inspectBtn: byId('inspectBtn'),
-  configSelect: byId('configSelect'),
-  loadConfigBtn: byId('loadConfig'),
-  saveConfigBtn: byId('saveConfig'),
-  configEditor: byId('configEditor'),
-  configMeta: byId('configMeta'),
-  runPipelineBtn: byId('runPipeline'),
-  runTokenizerBtn: byId('runTokenizer'),
-  runTrainBtn: byId('runTrain'),
+  runSetupMeta: byId('runSetupMeta'),
+  runCreateBtn: byId('runCreate'),
   runsMeta: byId('runsMeta'),
   refreshRunsBtn: byId('refreshRuns'),
   runsFilterStage: byId('runsFilterStage'),
@@ -69,6 +63,9 @@ export const els = {
 
   runTokenizerVocabSelect: byId('runTokenizerVocabSelect'),
   refreshTokenizerVocabsBtn: byId('refreshTokenizerVocabs'),
+
+  trainingConfigSelect: byId('trainingConfigSelect'),
+  refreshTrainingConfigsBtn: byId('refreshTrainingConfigs'),
 
   tokenizerConfigList: byId('tokenizerConfigList'),
   tokenizerConfigEditor: byId('tokenizerConfigEditor'),

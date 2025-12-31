@@ -1,5 +1,5 @@
 import { initNav } from './modules/nav.js';
-import { initPipeline } from './modules/pipeline.js';
+import { initRunSetup } from './modules/run_setup.js';
 import { initRuns } from './modules/runs.js';
 import { initSession } from './modules/session.js';
 import { initPrompt } from './modules/prompt.js';
@@ -15,7 +15,7 @@ initSession();
 initPrompt();
 initTraining();
 initInspect();
-initPipeline();
+initRunSetup();
 initRuns();
 initDatasets();
 initTokenizerConfigs();

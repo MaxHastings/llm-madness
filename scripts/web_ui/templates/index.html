@@ -117,29 +117,23 @@
 
     <section class="page-section" data-section="runs">
       <div class="panel">
-        <h2>Run Setup</h2>
-        <div class="controls">
-          <select id="configSelect"></select>
-          <button id="loadConfig" class="primary">Load</button>
-          <button id="saveConfig">Save</button>
-          <span class="meta" id="configMeta"></span>
-        </div>
+        <h2>Create Run</h2>
         <div class="controls">
           <select id="datasetSelect"></select>
           <button id="refreshDatasets" class="primary">Refresh Datasets</button>
-          <span class="meta">Applies to Tokenizer/Train</span>
-        </div>
-        <div class="controls">
-          <button class="primary" data-run="pipeline" id="runPipeline">Create Run</button>
-          <button data-run="tokenizer" id="runTokenizer">Tokenizer</button>
-          <button data-run="train" id="runTrain">Train</button>
         </div>
         <div class="controls">
           <select id="runTokenizerVocabSelect"></select>
-          <button id="refreshTokenizerVocabs">Refresh Vocabs</button>
-          <span class="meta">Applies to Train</span>
+          <button id="refreshTokenizerVocabs">Refresh Tokenizer Vocabs</button>
         </div>
-        <textarea id="configEditor" placeholder="Select a config to edit..." spellcheck="false"></textarea>
+        <div class="controls">
+          <select id="trainingConfigSelect"></select>
+          <button id="refreshTrainingConfigs">Refresh Training Configs</button>
+        </div>
+        <div class="controls">
+          <button class="primary" id="runCreate">Create Run</button>
+          <span class="meta" id="runSetupMeta"></span>
+        </div>
       </div>
       <div class="panel runs-workspace">
         <div class="panel-head">

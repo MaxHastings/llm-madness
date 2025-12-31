@@ -1,6 +1,6 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
-import { loadTokenizerVocabs, setTokenizerVocabSelection } from './pipeline.js';
+import { loadTokenizerVocabs, setTokenizerVocabSelection } from './run_setup.js';
 
 function formatDate(value) {
   if (!value) return '-';

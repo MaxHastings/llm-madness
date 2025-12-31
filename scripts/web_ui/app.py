@@ -590,10 +590,13 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": "another run is active; stop it first"}, status=400)
                     return
                 payload = self._read_json()
-                stage = payload.get("stage", "pipeline")
-                config_name = payload.get("config", "pipeline.json")
+                stage = payload.get("stage", "train")
+                config_name = payload.get("config", "training/default__v001.json")
                 dataset_manifest = payload.get("dataset_manifest")
                 tokenizer_path = payload.get("tokenizer_path")
+                if stage not in {"tokenizer", "train"}:
+                    self._send_json({"error": "unsupported stage"}, status=400)
+                    return
                 if config_name.startswith("configs/"):
                     config_name = config_name[len("configs/"):]
                 config_path = (CONFIGS_DIR / config_name).resolve()
@@ -625,21 +628,24 @@ class Handler(BaseHTTPRequestHandler):
                     tokenizer_path_resolved = candidate
                 run_id = timestamp()
                 cmd = [sys.executable, "-m"]
-                if stage == "pipeline":
-                    cmd += ["scripts.pipeline", "--config", str(config_path), "--set", f"run.id={run_id}"]
-                    run_dir = RUNS_ROOT / "pipeline" / run_id
-                elif stage == "tokenizer":
+                if stage == "tokenizer":
+                    if dataset_manifest_path is None:
+                        self._send_json({"error": "dataset manifest required for tokenizer run"}, status=400)
+                        return
                     cmd += ["scripts.train_tokenizer", "--config", str(config_path), "--set", f"run.id={run_id}"]
-                    if dataset_manifest_path is not None:
-                        cmd += ["--dataset-manifest", str(dataset_manifest_path)]
-                    run_dir = Path("runs/tokenizer") / run_id
+                    cmd += ["--dataset-manifest", str(dataset_manifest_path)]
+                    run_dir = RUNS_ROOT / "tokenizer" / run_id
                 elif stage == "train":
+                    if dataset_manifest_path is None:
+                        self._send_json({"error": "dataset manifest required for training run"}, status=400)
+                        return
+                    if tokenizer_path_resolved is None:
+                        self._send_json({"error": "tokenizer vocab required for training run"}, status=400)
+                        return
                     cmd += ["scripts.train_model", "--config", str(config_path), "--set", f"run.id={run_id}"]
-                    if dataset_manifest_path is not None:
-                        cmd += ["--dataset-manifest", str(dataset_manifest_path)]
-                    if tokenizer_path_resolved is not None:
-                        cmd += ["--tokenizer", str(tokenizer_path_resolved)]
-                    run_dir = Path("runs/train") / run_id
+                    cmd += ["--dataset-manifest", str(dataset_manifest_path)]
+                    cmd += ["--tokenizer", str(tokenizer_path_resolved)]
+                    run_dir = RUNS_ROOT / "train" / run_id
                 else:
                     self._send_json({"error": f"unknown stage '{stage}'"}, status=400)
                     return
