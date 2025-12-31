@@ -356,7 +356,7 @@ button.token-btn:hover {
   padding: 8px 10px;
   background: #fdf9f3;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   gap: 10px;
   min-width: 0;
 }
@@ -374,8 +374,14 @@ button.token-btn:hover {
 .run-actions {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.run-actions button {
+  padding: 4px 10px;
+  font-size: 11px;
 }
 
 .run-main {
@@ -454,7 +460,7 @@ button.token-btn:hover {
 
 .runs-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }

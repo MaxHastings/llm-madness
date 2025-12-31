@@ -37,7 +37,6 @@ export const els = {
   runsFilterStage: byId('runsFilterStage'),
   runsFilterStatus: byId('runsFilterStatus'),
   runsSort: byId('runsSort'),
-  runsAutoRefresh: byId('runsAutoRefresh'),
   runsActiveList: byId('runsActiveList'),
   runsHistoryList: byId('runsHistoryList'),
   runDetailMeta: byId('runDetailMeta'),
@@ -50,9 +49,6 @@ export const els = {
   runLossMeta: byId('runLossMeta'),
   runLogs: byId('runLogs'),
   runLoadStatus: byId('runLoadStatus'),
-  loadRunFromDrawer: byId('loadRunFromDrawer'),
-  clearRunDetailBtn: byId('clearRunDetail'),
-  liveRunLogs: byId('liveRunLogs'),
 
   datasetPath: byId('datasetPath'),
   datasetEntries: byId('datasetEntries'),

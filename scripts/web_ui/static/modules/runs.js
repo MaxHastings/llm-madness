@@ -1,14 +1,12 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
 import { renderLossChart } from './loss_chart.js';
-import { loadRunIntoInspector } from './session.js';
 
 let runsCache = [];
 let selectedRun = null;
 let selectedRunDetails = null;
 let currentLogTab = 'logs';
-let autoRefreshEnabled = true;
-let liveLogsEnabled = true;
+const liveLogsEnabled = true;
 let logStream = null;
 let lossStream = null;
 let runLossLogs = [];
@@ -261,16 +259,9 @@ function renderRunRow(item) {
   actions.className = 'run-actions';
 
   const viewBtn = document.createElement('button');
-  viewBtn.textContent = 'View';
+  viewBtn.textContent = 'Inspect';
   viewBtn.addEventListener('click', () => showRunDetails(item.run_dir));
   actions.appendChild(viewBtn);
-
-  if (item.stage === 'train') {
-    const loadBtn = document.createElement('button');
-    loadBtn.textContent = 'Load';
-    loadBtn.addEventListener('click', () => loadRunIntoInspector(item));
-    actions.appendChild(loadBtn);
-  }
 
   if (item.is_active) {
     const stopBtn = document.createElement('button');
@@ -297,10 +288,6 @@ function renderRunRow(item) {
 
   row.appendChild(main);
   row.appendChild(actions);
-  row.addEventListener('click', (event) => {
-    if (event.target.closest('button')) return;
-    showRunDetails(item.run_dir);
-  });
   return row;
 }
 
@@ -391,9 +378,7 @@ function setLogTab(tab) {
   }
   const lines = tab === 'process' ? selectedRunDetails.process_log : selectedRunDetails.logs;
   els.runLogs.textContent = (lines || []).join('\n') || 'No logs available.';
-  if (liveLogsEnabled) {
-    startLogStream(tab);
-  }
+  startLogStream(tab);
   ensureLossStream();
 }
 
@@ -450,14 +435,8 @@ async function showRunDetails(runDir) {
     logs: data.logs || [],
     process_log: data.process_log || [],
   };
-  autoRefreshEnabled = false;
-  if (els.runsAutoRefresh) {
-    els.runsAutoRefresh.checked = false;
-  }
-  liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
   els.runDetailMeta.textContent = selectedRun ? `${selectedRun.stage} | ${selectedRun.run_id}` : 'Run detail';
-  els.runLoadStatus.textContent = 'Auto-refresh paused while viewing this run.';
-  els.loadRunFromDrawer.disabled = !(selectedRun && selectedRun.stage === 'train');
+  els.runLoadStatus.textContent = 'Viewing run details.';
   renderSummary(data.summary);
   renderManifest(data.manifest);
   updateRunHighlights(data.manifest, data.summary?.run_dir);
@@ -490,7 +469,7 @@ function ensureLossStream() {
     stopLossStream();
     return;
   }
-  if (!liveLogsEnabled || currentLogTab === 'logs') {
+  if (currentLogTab === 'logs') {
     stopLossStream();
     return;
   }
@@ -520,6 +499,10 @@ function startLossStream() {
 function startLogStream(kind) {
   if (!selectedRun) return;
   stopLogStream();
+  if (kind === 'logs' && selectedRun.stage === 'train') {
+    runLossLogs = [];
+    renderRunLossChart();
+  }
   const params = new URLSearchParams({
     run_dir: selectedRun.run_dir,
     kind,
@@ -571,24 +554,20 @@ async function refreshSelectedRunDetails() {
   if (!selectedRun) return;
   const data = await fetchJson(`/api/run/${encodeURIComponent(selectedRun.run_dir)}`);
   selectedRun = data.summary || selectedRun;
-  if (!liveLogsEnabled) {
-    selectedRunDetails = {
-      logs: data.logs || [],
-      process_log: data.process_log || [],
-    };
-  }
+  selectedRunDetails = {
+    logs: data.logs || [],
+    process_log: data.process_log || [],
+  };
   renderSummary(data.summary);
   renderManifest(data.manifest);
   updateRunHighlights(data.manifest, data.summary?.run_dir || selectedRun?.run_dir);
-  if (!liveLogsEnabled && selectedRun.stage === 'train') {
+  if (selectedRun.stage === 'train') {
     seedRunLossLogs(data.logs || []);
-  } else if (!liveLogsEnabled) {
+  } else {
     runLossLogs = [];
     renderRunLossChart();
   }
-  if (!liveLogsEnabled) {
-    setLogTab(currentLogTab);
-  }
+  setLogTab(currentLogTab);
   const now = new Date();
   const stamp = now.toTimeString().slice(0, 8);
   els.runLoadStatus.textContent = `Live logs refreshed at ${stamp}`;
@@ -607,12 +586,6 @@ function clearRunDetail() {
   if (els.runTrainingConfigName) els.runTrainingConfigName.textContent = '-';
   runLossLogs = [];
   renderRunLossChart();
-  els.loadRunFromDrawer.disabled = true;
-  autoRefreshEnabled = true;
-  if (els.runsAutoRefresh) {
-    els.runsAutoRefresh.checked = true;
-  }
-  liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
   stopLogStream();
   stopLossStream();
 }
@@ -627,8 +600,7 @@ function renderRunsFromCache() {
   const filteredCount = filtered.length;
   const totalCount = runsCache.length;
   const countLabel = filteredCount === totalCount ? `${totalCount} runs` : `${filteredCount} of ${totalCount} runs`;
-  const pauseNote = autoRefreshEnabled ? '' : ' | auto-refresh paused';
-  els.runsMeta.textContent = `${countLabel} | ${activeCount} active${pauseNote}`;
+  els.runsMeta.textContent = `${countLabel} | ${activeCount} active`;
 }
 
 export async function refreshRunList() {
@@ -644,41 +616,8 @@ export function initRuns() {
   els.runsFilterStage.addEventListener('change', renderRunsFromCache);
   els.runsFilterStatus.addEventListener('change', renderRunsFromCache);
   els.runsSort.addEventListener('change', renderRunsFromCache);
-  els.runsAutoRefresh.addEventListener('change', () => {
-    autoRefreshEnabled = els.runsAutoRefresh.checked;
-    renderRunsFromCache();
-  });
-  els.liveRunLogs.addEventListener('change', () => {
-    liveLogsEnabled = els.liveRunLogs.checked;
-    if (liveLogsEnabled) {
-      refreshSelectedRunDetails();
-      startLogStream(currentLogTab);
-      ensureLossStream();
-    } else {
-      stopLogStream();
-      stopLossStream();
-    }
-  });
-  els.loadRunFromDrawer.addEventListener('click', async () => {
-    if (!selectedRun) return;
-    await loadRunIntoInspector(selectedRun);
-  });
-  els.clearRunDetailBtn.addEventListener('click', () => {
-    clearRunDetail();
-    renderRunsFromCache();
-  });
   document.querySelectorAll('.run-tabs .tab').forEach((btn) => {
     btn.addEventListener('click', () => setLogTab(btn.dataset.tab));
   });
-  liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
   refreshRunList();
-  setInterval(() => {
-    if (autoRefreshEnabled) {
-      refreshRunList();
-    }
-    if (!selectedRun) return;
-    if (liveLogsEnabled || (els.liveRunLogs && els.liveRunLogs.checked)) {
-      refreshSelectedRunDetails();
-    }
-  }, 8000);
 }

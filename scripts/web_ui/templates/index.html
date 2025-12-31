@@ -149,17 +149,13 @@
               <p class="meta" id="runsMeta"></p>
             </div>
             <div class="controls">
-              <button id="refreshRuns" class="primary">Refresh</button>
-              <input id="runsSearch" placeholder="Search runs" />
-              <select id="runsFilterStage"></select>
-              <select id="runsFilterStatus"></select>
-              <select id="runsSort"></select>
-              <label class="meta runs-toggle">
-                <input type="checkbox" id="runsAutoRefresh" checked />
-                Auto refresh
-              </label>
-            </div>
+            <button id="refreshRuns" class="primary">Refresh</button>
+            <input id="runsSearch" placeholder="Search runs" />
+            <select id="runsFilterStage"></select>
+            <select id="runsFilterStatus"></select>
+            <select id="runsSort"></select>
           </div>
+        </div>
           <div class="runs-columns">
             <details class="runs-section" open>
               <summary>Active</summary>
@@ -177,14 +173,6 @@
               <div>
                 <h3>Inspector Target</h3>
                 <div class="meta" id="runDetailMeta">Select a run to inspect.</div>
-              </div>
-              <div class="drawer-actions">
-                <label class="meta drawer-toggle">
-                  <input type="checkbox" id="liveRunLogs" checked />
-                  Live logs
-                </label>
-                <button id="loadRunFromDrawer" class="primary" disabled>Load into Inspector</button>
-                <button id="clearRunDetail">Clear</button>
               </div>
             </div>
             <div class="meta" id="runLoadStatus"></div>
