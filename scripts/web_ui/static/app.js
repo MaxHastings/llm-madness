@@ -127,11 +127,30 @@ function renderRunList(items) {
     status.textContent = item.status || 'unknown';
     info.appendChild(stage);
     info.appendChild(status);
-    const btn = document.createElement('button');
-    btn.textContent = 'View';
-    btn.addEventListener('click', () => showRunDetails(item.run_dir));
+    const actions = document.createElement('div');
+    const viewBtn = document.createElement('button');
+    viewBtn.textContent = 'View';
+    viewBtn.addEventListener('click', () => showRunDetails(item.run_dir));
+    const stopBtn = document.createElement('button');
+    stopBtn.textContent = 'Stop';
+    stopBtn.addEventListener('click', async () => {
+      const runId = item.run_dir.split('/').pop();
+      await api(`/api/stop/${encodeURIComponent(runId)}`);
+      await refreshRunList();
+    });
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', async () => {
+      await api('/api/run/delete', { run_dir: item.run_dir });
+      runDetail.textContent = '';
+      runDetailMeta.textContent = '';
+      await refreshRunList();
+    });
+    actions.appendChild(viewBtn);
+    actions.appendChild(stopBtn);
+    actions.appendChild(deleteBtn);
     row.appendChild(info);
-    row.appendChild(btn);
+    row.appendChild(actions);
     runsList.appendChild(row);
   });
 }
@@ -140,7 +159,11 @@ async function showRunDetails(runDir) {
   const res = await fetch(`/api/run/${encodeURIComponent(runDir)}`);
   const data = await res.json();
   runDetailMeta.textContent = data.run_dir || 'run detail';
-  const payload = { manifest: data.manifest || null, logs: data.logs || [] };
+  const payload = {
+    manifest: data.manifest || null,
+    logs: data.logs || [],
+    process_log: data.process_log || [],
+  };
   runDetail.textContent = JSON.stringify(payload, null, 2);
 }
 

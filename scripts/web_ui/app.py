@@ -103,6 +103,9 @@ class Handler(BaseHTTPRequestHandler):
                 logs_path = run_path / "logs.jsonl"
                 if logs_path.exists():
                     payload["logs"] = logs_path.read_text().splitlines()[-200:]
+                proc_log = run_path / "process.log"
+                if proc_log.exists():
+                    payload["process_log"] = proc_log.read_text().splitlines()[-200:]
                 self._send_json(payload)
                 return
             self._send_json({"error": "run not found"}, status=404)
@@ -220,6 +223,31 @@ class Handler(BaseHTTPRequestHandler):
                 proc = info["process"]
                 proc.terminate()
                 self._send_json({"status": "stopping", "run_id": run_id})
+                return
+            if self.path == "/api/run/delete":
+                payload = self._read_json()
+                run_dir = payload.get("run_dir")
+                if not run_dir:
+                    self._send_json({"error": "run_dir required"}, status=400)
+                    return
+                run_path = Path(run_dir).resolve()
+                if RUNS_ROOT.resolve() not in run_path.parents and DATA_ROOT.resolve() not in run_path.parents:
+                    self._send_json({"error": "invalid run path"}, status=400)
+                    return
+                run_id = run_path.name
+                if run_id in RUN_PROCS and RUN_PROCS[run_id]["process"].poll() is None:
+                    self._send_json({"error": "run is still active; stop it first"}, status=400)
+                    return
+                if not run_path.exists():
+                    self._send_json({"error": "run not found"}, status=404)
+                    return
+                for child in sorted(run_path.rglob("*"), reverse=True):
+                    if child.is_file():
+                        child.unlink()
+                    elif child.is_dir():
+                        child.rmdir()
+                run_path.rmdir()
+                self._send_json({"status": "deleted", "run_dir": str(run_path)})
                 return
             if self.path == "/api/runs":
                 payload = self._read_json()
@@ -362,17 +390,32 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
 
+    def find_latest_with_manifest(root: Path) -> Path | None:
+        if not root.exists():
+            return None
+        candidates = []
+        for entry in root.iterdir():
+            if entry.is_dir() and (entry / "run.json").exists():
+                candidates.append(entry)
+        return sorted(candidates, key=lambda p: p.name)[-1] if candidates else None
+
     run_dir = args.run_dir
     if run_dir is None:
-        latest = find_latest_run(Path("runs/train"))
+        latest = find_latest_with_manifest(Path("runs/train"))
         if latest is None:
-            raise SystemExit("no training runs found; pass --run-dir")
-        run_dir = latest
+            print("warning: no training runs with run.json found; starting UI without a loaded run")
+            run_dir = None
+        else:
+            run_dir = latest
 
     global STATE
     global DEVICE_OVERRIDE
     DEVICE_OVERRIDE = args.device
-    STATE = ServerState(run_dir, args.checkpoint, DEVICE_OVERRIDE)
+    if run_dir is not None:
+        if not (run_dir / "run.json").exists():
+            print(f"warning: run.json missing in {run_dir}; starting UI without a loaded run")
+        else:
+            STATE = ServerState(run_dir, args.checkpoint, DEVICE_OVERRIDE)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"server running on http://{args.host}:{args.port}")
     server.serve_forever()

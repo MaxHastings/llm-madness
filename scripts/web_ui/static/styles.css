@@ -199,6 +199,11 @@ button.token-btn:hover {
   border-radius: 999px;
 }
 
+.run-item div:last-child {
+  display: flex;
+  gap: 6px;
+}
+
 .run-stage {
   font-size: 11px;
   text-transform: uppercase;
