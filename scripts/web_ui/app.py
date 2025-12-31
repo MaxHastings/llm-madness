@@ -25,7 +25,7 @@ from .state import ServerState
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = BASE_DIR / "templates" / "index.html"
 STATIC_DIR = BASE_DIR / "static"
-REPO_ROOT = BASE_DIR.parents[2]
+REPO_ROOT = BASE_DIR.parents[1]
 
 
 STATE: ServerState | None = None
@@ -33,7 +33,7 @@ DEVICE_OVERRIDE = "auto"
 RUNS_DIR = Path("runs/train")
 CONFIGS_DIR = Path("configs")
 RUNS_ROOT = Path("runs")
-DATA_ROOT = Path("data")
+DATA_ROOT = REPO_ROOT / "data"
 DATASETS_DIR = RUNS_ROOT / "datasets"
 TOKENIZER_RUNS_DIR = RUNS_ROOT / "tokenizer"
 RUN_PROCS: dict[str, dict] = {}
