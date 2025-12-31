@@ -1,5 +1,6 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
+import { renderLossChart } from './loss_chart.js';
 import { loadRunIntoInspector } from './session.js';
 
 let runsCache = [];
@@ -9,6 +10,12 @@ let currentLogTab = 'logs';
 let autoRefreshEnabled = true;
 let liveLogsEnabled = true;
 let logStream = null;
+let lossStream = null;
+let runLossLogs = [];
+let datasetsCache = null;
+let datasetsCacheAt = 0;
+let tokenizerVocabsCache = null;
+let tokenizerVocabsCacheAt = 0;
 
 function formatTime(ts) {
   if (!ts) return '-';
@@ -32,6 +39,88 @@ function formatManifestValue(value) {
     return entries.map(([key, val]) => `${key}: ${formatManifestValue(val)}`).join(' | ');
   }
   return `${value}`;
+}
+
+function extractRunId(path, segment) {
+  if (!path) return null;
+  const normalized = path.replace(/\\/g, '/');
+  const parts = normalized.split('/');
+  const idx = parts.lastIndexOf(segment);
+  if (idx === -1 || idx + 1 >= parts.length) return null;
+  return parts[idx + 1];
+}
+
+function formatHighlight(value, fallback = '-') {
+  if (!value) return fallback;
+  return value;
+}
+
+async function loadDatasetsCache() {
+  const now = Date.now();
+  if (datasetsCache && now - datasetsCacheAt < 30000) {
+    return datasetsCache;
+  }
+  const data = await fetchJson('/api/datasets');
+  datasetsCache = data.datasets || [];
+  datasetsCacheAt = now;
+  return datasetsCache;
+}
+
+async function loadTokenizerVocabsCache() {
+  const now = Date.now();
+  if (tokenizerVocabsCache && now - tokenizerVocabsCacheAt < 30000) {
+    return tokenizerVocabsCache;
+  }
+  const data = await fetchJson('/api/tokenizer_vocabs');
+  tokenizerVocabsCache = data.vocabs || [];
+  tokenizerVocabsCacheAt = now;
+  return tokenizerVocabsCache;
+}
+
+async function updateRunHighlights(manifest, runDir) {
+  if (!els.runDatasetName || !els.runTokenizerName || !els.runTrainingConfigName) return;
+  els.runDatasetName.textContent = '-';
+  els.runTokenizerName.textContent = '-';
+  els.runTrainingConfigName.textContent = '-';
+  if (!manifest) return;
+  const guardRunDir = runDir;
+
+  const configMeta = manifest.config?.meta;
+  const trainingName = configMeta?.name || configMeta?.id || configMeta?.parent_id;
+  els.runTrainingConfigName.textContent = formatHighlight(trainingName);
+
+  const dataPath = manifest.inputs?.data;
+  const tokenizerPath = manifest.inputs?.tokenizer;
+  const datasetId = extractRunId(dataPath, 'datasets');
+  const tokenizerRunId = extractRunId(tokenizerPath, 'tokenizer');
+
+  if (dataPath) {
+    const datasets = await loadDatasetsCache();
+    if (guardRunDir && (!selectedRun || selectedRun.run_dir !== guardRunDir)) return;
+    const match = datasets.find((row) => row.snapshot_path === dataPath || row.id === datasetId);
+    if (match) {
+      const label = match.name || match.id;
+      els.runDatasetName.textContent = formatHighlight(label, `dataset ${datasetId || '-'}`);
+    } else if (datasetId) {
+      els.runDatasetName.textContent = `dataset ${datasetId}`;
+    } else {
+      els.runDatasetName.textContent = dataPath;
+    }
+  }
+
+  if (tokenizerPath) {
+    const vocabs = await loadTokenizerVocabsCache();
+    if (guardRunDir && (!selectedRun || selectedRun.run_dir !== guardRunDir)) return;
+    const match = vocabs.find((row) => row.tokenizer_path === tokenizerPath || row.run_id === tokenizerRunId);
+    if (match) {
+      const label = match.name || match.config_id || match.run_id;
+      els.runTokenizerName.textContent = formatHighlight(label, `tokenizer ${tokenizerRunId || '-'}`);
+    } else if (tokenizerRunId) {
+      els.runTokenizerName.textContent = `tokenizer ${tokenizerRunId}`;
+    } else {
+      els.runTokenizerName.textContent = tokenizerPath;
+    }
+  }
 }
 
 function updateFilterOptions(items) {
@@ -305,6 +394,53 @@ function setLogTab(tab) {
   if (liveLogsEnabled) {
     startLogStream(tab);
   }
+  ensureLossStream();
+}
+
+function parseLossLine(line) {
+  if (!line || line[0] !== '{') return null;
+  try {
+    const parsed = JSON.parse(line);
+    if (!Number.isFinite(parsed.iter)) return null;
+    if (parsed.train_loss == null && parsed.val_loss == null) return null;
+    return parsed;
+  } catch (err) {
+    return null;
+  }
+}
+
+function renderRunLossChart() {
+  if (!els.runLossChart) return;
+  if (!selectedRun || selectedRun.stage !== 'train') {
+    renderLossChart(els.runLossChart, [], { emptyMessage: 'No loss data yet.' });
+    if (els.runLossMeta) {
+      els.runLossMeta.textContent = '';
+    }
+    return;
+  }
+  renderLossChart(els.runLossChart, runLossLogs, { emptyMessage: 'No loss data yet.' });
+  if (!els.runLossMeta) return;
+  const last = runLossLogs[runLossLogs.length - 1];
+  if (last) {
+    const train = last.train_loss != null ? last.train_loss.toFixed(4) : '-';
+    const val = last.val_loss != null ? last.val_loss.toFixed(4) : '-';
+    els.runLossMeta.textContent = `iter ${last.iter} train ${train} val ${val}`;
+  } else {
+    els.runLossMeta.textContent = 'no loss data yet';
+  }
+}
+
+function seedRunLossLogs(lines) {
+  runLossLogs = [];
+  (lines || []).forEach((line) => {
+    const entry = parseLossLine(line);
+    if (!entry) return;
+    runLossLogs.push(entry);
+  });
+  if (runLossLogs.length > 1000) {
+    runLossLogs = runLossLogs.slice(-1000);
+  }
+  renderRunLossChart();
 }
 
 async function showRunDetails(runDir) {
@@ -324,6 +460,13 @@ async function showRunDetails(runDir) {
   els.loadRunFromDrawer.disabled = !(selectedRun && selectedRun.stage === 'train');
   renderSummary(data.summary);
   renderManifest(data.manifest);
+  updateRunHighlights(data.manifest, data.summary?.run_dir);
+  if (selectedRun && selectedRun.stage === 'train') {
+    seedRunLossLogs(data.logs || []);
+  } else {
+    runLossLogs = [];
+    renderRunLossChart();
+  }
   setLogTab(currentLogTab);
   renderRunsFromCache();
 }
@@ -333,6 +476,45 @@ function stopLogStream() {
     logStream.close();
     logStream = null;
   }
+}
+
+function stopLossStream() {
+  if (lossStream) {
+    lossStream.close();
+    lossStream = null;
+  }
+}
+
+function ensureLossStream() {
+  if (!selectedRun || selectedRun.stage !== 'train') {
+    stopLossStream();
+    return;
+  }
+  if (!liveLogsEnabled || currentLogTab === 'logs') {
+    stopLossStream();
+    return;
+  }
+  startLossStream();
+}
+
+function startLossStream() {
+  if (!selectedRun || selectedRun.stage !== 'train') return;
+  stopLossStream();
+  const params = new URLSearchParams({
+    run_dir: selectedRun.run_dir,
+    kind: 'logs',
+  });
+  lossStream = new EventSource(`/api/run/stream?${params.toString()}`);
+  lossStream.onmessage = (event) => {
+    if (!event.data) return;
+    const entry = parseLossLine(event.data);
+    if (!entry) return;
+    runLossLogs.push(entry);
+    if (runLossLogs.length > 1000) {
+      runLossLogs = runLossLogs.slice(-1000);
+    }
+    renderRunLossChart();
+  };
 }
 
 function startLogStream(kind) {
@@ -355,6 +537,16 @@ function startLogStream(kind) {
       selectedRunDetails.logs.push(event.data);
       if (selectedRunDetails.logs.length > 500) {
         selectedRunDetails.logs = selectedRunDetails.logs.slice(-500);
+      }
+      if (selectedRun && selectedRun.stage === 'train') {
+        const entry = parseLossLine(event.data);
+        if (entry) {
+          runLossLogs.push(entry);
+          if (runLossLogs.length > 1000) {
+            runLossLogs = runLossLogs.slice(-1000);
+          }
+          renderRunLossChart();
+        }
       }
     } else {
       selectedRunDetails.process_log.push(event.data);
@@ -387,6 +579,13 @@ async function refreshSelectedRunDetails() {
   }
   renderSummary(data.summary);
   renderManifest(data.manifest);
+  updateRunHighlights(data.manifest, data.summary?.run_dir || selectedRun?.run_dir);
+  if (!liveLogsEnabled && selectedRun.stage === 'train') {
+    seedRunLossLogs(data.logs || []);
+  } else if (!liveLogsEnabled) {
+    runLossLogs = [];
+    renderRunLossChart();
+  }
   if (!liveLogsEnabled) {
     setLogTab(currentLogTab);
   }
@@ -403,6 +602,11 @@ function clearRunDetail() {
   els.runSummary.innerHTML = '';
   els.runManifest.innerHTML = '';
   els.runLogs.textContent = '';
+  if (els.runDatasetName) els.runDatasetName.textContent = '-';
+  if (els.runTokenizerName) els.runTokenizerName.textContent = '-';
+  if (els.runTrainingConfigName) els.runTrainingConfigName.textContent = '-';
+  runLossLogs = [];
+  renderRunLossChart();
   els.loadRunFromDrawer.disabled = true;
   autoRefreshEnabled = true;
   if (els.runsAutoRefresh) {
@@ -410,6 +614,7 @@ function clearRunDetail() {
   }
   liveLogsEnabled = !!els.liveRunLogs && els.liveRunLogs.checked;
   stopLogStream();
+  stopLossStream();
 }
 
 function renderRunsFromCache() {
@@ -448,8 +653,10 @@ export function initRuns() {
     if (liveLogsEnabled) {
       refreshSelectedRunDetails();
       startLogStream(currentLogTab);
+      ensureLossStream();
     } else {
       stopLogStream();
+      stopLossStream();
     }
   });
   els.loadRunFromDrawer.addEventListener('click', async () => {

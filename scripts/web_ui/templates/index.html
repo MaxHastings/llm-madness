@@ -186,8 +186,30 @@
               </div>
             </div>
             <div class="meta" id="runLoadStatus"></div>
-            <div class="run-summary" id="runSummary"></div>
-            <div class="run-manifest" id="runManifest"></div>
+            <div class="run-highlights">
+              <div>
+                <span>Dataset</span>
+                <strong id="runDatasetName">-</strong>
+              </div>
+              <div>
+                <span>Tokenizer vocab</span>
+                <strong id="runTokenizerName">-</strong>
+              </div>
+              <div>
+                <span>Training config</span>
+                <strong id="runTrainingConfigName">-</strong>
+              </div>
+            </div>
+            <details class="run-details">
+              <summary>Details</summary>
+              <div class="run-summary" id="runSummary"></div>
+              <div class="run-manifest" id="runManifest"></div>
+            </details>
+            <div class="run-loss">
+              <div class="meta">Loss (train/val)</div>
+              <div id="runLossChart" class="chart run-loss-chart"></div>
+              <div class="meta" id="runLossMeta"></div>
+            </div>
             <div class="run-tabs">
               <button class="tab active" data-tab="logs">logs.jsonl</button>
               <button class="tab" data-tab="process">process.log</button>
