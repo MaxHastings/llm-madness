@@ -51,6 +51,7 @@ export const els = {
   runLoadStatus: byId('runLoadStatus'),
 
   datasetPath: byId('datasetPath'),
+  datasetRefreshBtn: byId('datasetRefresh'),
   datasetEntries: byId('datasetEntries'),
   datasetSelections: byId('datasetSelections'),
   datasetMeta: byId('datasetMeta'),

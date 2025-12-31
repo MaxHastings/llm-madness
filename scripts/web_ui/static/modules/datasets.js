@@ -178,6 +178,7 @@ async function createManifest() {
 
 export function initDatasets() {
   els.datasetCreateBtn.addEventListener('click', createManifest);
+  els.datasetRefreshBtn.addEventListener('click', () => loadPath(currentPath));
   els.datasetRefreshManifestsBtn.addEventListener('click', refreshDatasetManifests);
   renderSelections();
   loadPath(currentPath);
