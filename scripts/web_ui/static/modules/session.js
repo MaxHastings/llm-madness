@@ -1,7 +1,6 @@
 import { api } from './api.js';
 import { els } from './dom.js';
 import { resetTokens } from './prompt.js';
-import { refreshTokenizerReport, refreshTrainingLogs } from './training.js';
 
 export async function refreshCheckpoints() {
   try {
@@ -35,8 +34,6 @@ export async function loadRunIntoInspector(item) {
   els.checkpointMeta.textContent = data.status || data.error || 'failed to load run';
   resetTokens();
   await refreshCheckpoints();
-  await refreshTokenizerReport();
-  await refreshTrainingLogs();
 }
 
 async function refreshSessionRuns() {

@@ -20,7 +20,6 @@
         <button class="nav-btn" data-section="training-configs">Training Configs</button>
         <button class="nav-btn" data-section="runs">Training Runs</button>
         <button class="nav-btn" data-section="inspector">Inspect</button>
-        <button class="nav-btn" data-section="training">Diagnostics</button>
       </nav>
     </aside>
     <main>
@@ -203,6 +202,19 @@
             <div class="run-tabs">
               <button class="tab active" data-tab="logs">logs.jsonl</button>
               <button class="tab" data-tab="process">process.log</button>
+              <button class="tab" data-tab="tokenizer">Tokenizer Report</button>
+            </div>
+            <div id="runTokenizerReport" class="run-tokenizer-report is-hidden">
+              <div class="controls">
+                <button id="runTokenizerReportRefresh" class="primary">Refresh</button>
+                <span class="meta" id="runTokenizerReportMeta"></span>
+              </div>
+              <table id="runTokenizerReportTable">
+                <thead>
+                  <tr><th>Token</th><th>ID</th><th>Count</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
             </div>
             <pre id="runLogs" class="run-detail"></pre>
           </div>
@@ -321,33 +333,6 @@
       </div>
     </section>
 
-    <section class="page-section" data-section="training">
-      <div class="grid">
-        <div class="panel">
-          <h2>Tokenizer Report</h2>
-          <div class="controls">
-            <button id="tokenReportBtn" class="primary">Refresh</button>
-          </div>
-          <div id="tokenReportMeta" class="meta"></div>
-          <table id="tokenReportTable">
-            <thead>
-              <tr><th>Token</th><th>ID</th><th>Count</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <div class="panel">
-          <h2>Training Diagnostics</h2>
-          <div class="controls">
-            <button id="refreshLogs" class="primary">Refresh</button>
-          </div>
-          <div id="lossChart" class="chart"></div>
-          <div class="meta" id="lossMeta"></div>
-          <h3>Samples</h3>
-          <div id="sampleList" class="samples"></div>
-        </div>
-      </div>
-    </section>
     </main>
   </div>
 

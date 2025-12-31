@@ -633,6 +633,10 @@ button.token-btn:hover {
   border-color: var(--accent-2);
 }
 
+.is-hidden {
+  display: none;
+}
+
 .run-detail {
   margin-top: 10px;
   padding: 10px;
@@ -644,6 +648,10 @@ button.token-btn:hover {
   font-family: var(--mono);
   font-size: 11px;
   white-space: pre-wrap;
+}
+
+.run-tokenizer-report {
+  margin-top: 10px;
 }
 
 .run-loss-chart {

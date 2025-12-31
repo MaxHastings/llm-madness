@@ -367,11 +367,72 @@ function renderManifest(manifest) {
   }
 }
 
+function clearTokenizerReport() {
+  if (!els.runTokenizerReportTableBody) return;
+  els.runTokenizerReportTableBody.innerHTML = '';
+  if (els.runTokenizerReportMeta) {
+    els.runTokenizerReportMeta.textContent = '';
+  }
+}
+
+async function refreshRunTokenizerReport() {
+  if (!selectedRun) {
+    if (els.runTokenizerReportMeta) {
+      els.runTokenizerReportMeta.textContent = 'Select a run to view its tokenizer report.';
+    }
+    clearTokenizerReport();
+    return;
+  }
+  const data = await api('/api/run/tokenizer_report', { run_dir: selectedRun.run_dir });
+  if (data.error) {
+    clearTokenizerReport();
+    if (els.runTokenizerReportMeta) {
+      els.runTokenizerReportMeta.textContent = data.error;
+    }
+    return;
+  }
+  if (els.runTokenizerReportMeta) {
+    els.runTokenizerReportMeta.textContent = `tokens: ${data.total_tokens} unique: ${data.unique_tokens} vocab: ${data.vocab_size} coverage: ${(data.coverage * 100).toFixed(2)}% unk_rate: ${(data.unk_rate * 100).toFixed(2)}%`;
+  }
+  els.runTokenizerReportTableBody.innerHTML = '';
+  (data.top_tokens || []).forEach((row) => {
+    const tr = document.createElement('tr');
+    const tokenTd = document.createElement('td');
+    tokenTd.textContent = row.token;
+    const idTd = document.createElement('td');
+    idTd.textContent = `${row.id}`;
+    const countTd = document.createElement('td');
+    countTd.textContent = `${row.count}`;
+    tr.appendChild(tokenTd);
+    tr.appendChild(idTd);
+    tr.appendChild(countTd);
+    els.runTokenizerReportTableBody.appendChild(tr);
+  });
+}
+
+function showTokenizerReport(show) {
+  if (!els.runTokenizerReportWrap) return;
+  els.runTokenizerReportWrap.classList.toggle('is-hidden', !show);
+  if (show) {
+    els.runLogs.classList.add('is-hidden');
+  } else {
+    els.runLogs.classList.remove('is-hidden');
+  }
+}
+
 function setLogTab(tab) {
   currentLogTab = tab;
   document.querySelectorAll('.run-tabs .tab').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
+  if (tab === 'tokenizer') {
+    showTokenizerReport(true);
+    stopLogStream();
+    stopLossStream();
+    refreshRunTokenizerReport();
+    return;
+  }
+  showTokenizerReport(false);
   if (!selectedRunDetails) {
     els.runLogs.textContent = '';
     return;
@@ -447,6 +508,9 @@ async function showRunDetails(runDir) {
     renderRunLossChart();
   }
   setLogTab(currentLogTab);
+  if (currentLogTab === 'tokenizer') {
+    refreshRunTokenizerReport();
+  }
   renderRunsFromCache();
 }
 
@@ -581,6 +645,10 @@ function clearRunDetail() {
   els.runSummary.innerHTML = '';
   els.runManifest.innerHTML = '';
   els.runLogs.textContent = '';
+  clearTokenizerReport();
+  if (currentLogTab === 'tokenizer') {
+    refreshRunTokenizerReport();
+  }
   if (els.runDatasetName) els.runDatasetName.textContent = '-';
   if (els.runTokenizerName) els.runTokenizerName.textContent = '-';
   if (els.runTrainingConfigName) els.runTrainingConfigName.textContent = '-';
@@ -619,5 +687,8 @@ export function initRuns() {
   document.querySelectorAll('.run-tabs .tab').forEach((btn) => {
     btn.addEventListener('click', () => setLogTab(btn.dataset.tab));
   });
+  if (els.runTokenizerReportRefreshBtn) {
+    els.runTokenizerReportRefreshBtn.addEventListener('click', refreshRunTokenizerReport);
+  }
   refreshRunList();
 }

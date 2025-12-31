@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+from collections import Counter
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -18,6 +19,7 @@ os.environ.setdefault("KMP_USE_SHM", "0")
 import torch
 
 from llm_madness.datasets.manifest import create_dataset_manifest
+from llm_madness.tokenizer import load_tokenizer
 from llm_madness.utils import find_latest_run, timestamp
 
 from .state import ServerState
@@ -217,6 +219,84 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
         "last_log": last_log,
         "has_manifest": has_manifest,
         "is_active": is_active,
+    }
+
+
+def resolve_latest_path(path: Path) -> Path:
+    if "latest" not in path.parts:
+        return path
+    parts = list(path.parts)
+    idx = parts.index("latest")
+    base = Path(*parts[:idx])
+    suffix = Path(*parts[idx + 1 :])
+    latest = find_latest_run(base)
+    if latest is None:
+        return path
+    return latest / suffix
+
+
+def build_tokenizer_report(run_dir: Path, top_n: int = 25, max_chars: int = 200_000) -> dict:
+    manifest_path = run_dir / "run.json"
+    if not manifest_path.exists():
+        return {"error": "run.json missing for this run"}
+    try:
+        run_config = json.loads(manifest_path.read_text())
+    except json.JSONDecodeError:
+        return {"error": "run.json is invalid"}
+
+    tokenizer_path = run_dir / "tokenizer.json"
+    if not tokenizer_path.exists():
+        fallback = run_config.get("inputs", {}).get("tokenizer")
+        if not fallback:
+            return {"error": "tokenizer path missing in run.json"}
+        tokenizer_path = resolve_latest_path(Path(fallback))
+    if not tokenizer_path.exists():
+        return {"error": f"tokenizer not found: {tokenizer_path}"}
+
+    data_path_raw = run_config.get("inputs", {}).get("data")
+    if not data_path_raw:
+        return {"error": "data path missing in run.json"}
+    data_path = resolve_latest_path(Path(data_path_raw))
+    if not data_path.exists():
+        return {"error": f"missing data file: {data_path_raw}"}
+
+    tokenizer = load_tokenizer(tokenizer_path)
+    text = data_path.read_text(errors="ignore")
+    if len(text) > max_chars:
+        text = text[:max_chars]
+
+    ids = tokenizer.encode(text).ids
+    total_tokens = len(ids)
+    vocab_size = tokenizer.get_vocab_size()
+    unique_tokens = len(set(ids))
+    coverage = unique_tokens / max(1, vocab_size)
+
+    vocab = tokenizer.get_vocab()
+    unk_id = None
+    for token in ("<|unk|>", "<unk>", "[UNK]"):
+        if token in vocab:
+            unk_id = vocab[token]
+            break
+    unk_count = ids.count(unk_id) if unk_id is not None else 0
+    unk_rate = unk_count / max(1, total_tokens)
+
+    freq = Counter(ids)
+    top_tokens = []
+    for token_id, count in freq.most_common(top_n):
+        top_tokens.append(
+            {
+                "id": token_id,
+                "token": tokenizer.id_to_token(token_id),
+                "count": count,
+            }
+        )
+    return {
+        "total_tokens": total_tokens,
+        "unique_tokens": unique_tokens,
+        "vocab_size": vocab_size,
+        "coverage": coverage,
+        "unk_rate": unk_rate,
+        "top_tokens": top_tokens,
     }
 
 
@@ -733,6 +813,20 @@ class Handler(BaseHTTPRequestHandler):
                 proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
                 RUN_PROCS[run_id] = {"process": proc, "stage": stage, "run_dir": str(run_dir)}
                 self._send_json({"run_id": run_id, "run_dir": str(run_dir), "stage": stage})
+                return
+            if self.path == "/api/run/tokenizer_report":
+                payload = self._read_json()
+                run_dir = payload.get("run_dir")
+                top_n = int(payload.get("top_n", 25))
+                if not run_dir:
+                    self._send_json({"error": "run_dir required"}, status=400)
+                    return
+                run_path = Path(str(run_dir)).resolve()
+                if RUNS_ROOT.resolve() not in run_path.parents:
+                    self._send_json({"error": "invalid run path"}, status=400)
+                    return
+                report = build_tokenizer_report(run_path, top_n=top_n)
+                self._send_json(report)
                 return
             if self.path.startswith("/api/stop/"):
                 run_id = unquote(self.path[len("/api/stop/"):])
