@@ -20,6 +20,20 @@ const inspectHeatmap = document.getElementById('inspectHeatmap');
 const inspectTokens = document.getElementById('inspectTokens');
 const layerTopkWrap = document.getElementById('layerTopkWrap');
 const layerTopkTable = document.getElementById('layerTopkTable').querySelector('tbody');
+const configSelect = document.getElementById('configSelect');
+const loadConfigBtn = document.getElementById('loadConfig');
+const saveConfigBtn = document.getElementById('saveConfig');
+const configEditor = document.getElementById('configEditor');
+const configMeta = document.getElementById('configMeta');
+const runsList = document.getElementById('runsList');
+const refreshRunsBtn = document.getElementById('refreshRuns');
+const runsMeta = document.getElementById('runsMeta');
+const runDetail = document.getElementById('runDetail');
+const runDetailMeta = document.getElementById('runDetailMeta');
+const runPipelineBtn = document.getElementById('runPipeline');
+const runGenerateBtn = document.getElementById('runGenerate');
+const runTokenizerBtn = document.getElementById('runTokenizer');
+const runTrainBtn = document.getElementById('runTrain');
 
 const state = { ids: [], tokens: [] };
 
@@ -34,6 +48,106 @@ async function api(path, payload) {
     throw new Error(msg);
   }
   return res.json();
+}
+
+async function loadConfigs() {
+  const data = await api('/api/configs');
+  configSelect.innerHTML = '';
+  data.configs.forEach((name) => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    configSelect.appendChild(opt);
+  });
+  if (data.configs.length) {
+    const preferred = data.configs.find((name) => name === 'pipeline.json') || data.configs[0];
+    configSelect.value = preferred;
+  }
+}
+
+async function loadSelectedConfig() {
+  const name = configSelect.value;
+  if (!name) return;
+  const res = await fetch(`/api/configs/${encodeURIComponent(name)}`);
+  const data = await res.json();
+  if (data.raw) {
+    configEditor.value = data.raw;
+    configMeta.textContent = `loaded ${name}`;
+  } else {
+    configMeta.textContent = data.error || 'failed to load config';
+  }
+}
+
+function parseConfigEditor() {
+  const raw = configEditor.value;
+  try {
+    JSON.parse(raw);
+    return { ok: true, raw };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function saveSelectedConfig() {
+  const name = configSelect.value;
+  const parsed = parseConfigEditor();
+  if (!parsed.ok) {
+    configMeta.textContent = `invalid json: ${parsed.error}`;
+    return;
+  }
+  const data = await api('/api/configs/save', { name, raw: parsed.raw });
+  configMeta.textContent = data.status ? `saved ${name}` : data.error || 'save failed';
+}
+
+async function startRun(stage) {
+  const name = configSelect.value;
+  if (!name) return;
+  const parsed = parseConfigEditor();
+  if (!parsed.ok) {
+    configMeta.textContent = `invalid json: ${parsed.error}`;
+    return;
+  }
+  await saveSelectedConfig();
+  const data = await api('/api/run', { stage, config: name });
+  runsMeta.textContent = data.run_id ? `started ${stage} (${data.run_id})` : data.error || 'run failed';
+  await refreshRunList();
+}
+
+function renderRunList(items) {
+  runsList.innerHTML = '';
+  items.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'run-item';
+    const info = document.createElement('div');
+    const stage = document.createElement('div');
+    stage.className = 'run-stage';
+    stage.textContent = item.stage || 'unknown';
+    const status = document.createElement('div');
+    status.className = 'run-status';
+    status.textContent = item.status || 'unknown';
+    info.appendChild(stage);
+    info.appendChild(status);
+    const btn = document.createElement('button');
+    btn.textContent = 'View';
+    btn.addEventListener('click', () => showRunDetails(item.run_dir));
+    row.appendChild(info);
+    row.appendChild(btn);
+    runsList.appendChild(row);
+  });
+}
+
+async function showRunDetails(runDir) {
+  const res = await fetch(`/api/run/${encodeURIComponent(runDir)}`);
+  const data = await res.json();
+  runDetailMeta.textContent = data.run_dir || 'run detail';
+  const payload = { manifest: data.manifest || null, logs: data.logs || [] };
+  runDetail.textContent = JSON.stringify(payload, null, 2);
+}
+
+async function refreshRunList() {
+  const data = await api('/api/runs', { scope: 'all' });
+  renderRunList(data.runs || []);
+  runsMeta.textContent = `${(data.runs || []).length} runs`;
 }
 
 function renderTokens(tokens, ids) {
@@ -370,6 +484,15 @@ async function appendToken(tokenId) {
   await probeNext();
 }
 
+loadConfigBtn.addEventListener('click', loadSelectedConfig);
+saveConfigBtn.addEventListener('click', saveSelectedConfig);
+refreshRunsBtn.addEventListener('click', refreshRunList);
+runPipelineBtn.addEventListener('click', () => startRun('pipeline'));
+runGenerateBtn.addEventListener('click', () => startRun('generate'));
+runTokenizerBtn.addEventListener('click', () => startRun('tokenizer'));
+runTrainBtn.addEventListener('click', () => startRun('train'));
+configSelect.addEventListener('change', loadSelectedConfig);
+
 document.getElementById('tokenizeBtn').addEventListener('click', async () => {
   const data = await api('/api/tokenize', { text: promptInput.value });
   state.ids = data.ids;
@@ -453,3 +576,5 @@ refreshCheckpoints();
 refreshRuns();
 refreshTokenizerReport();
 refreshTrainingLogs();
+loadConfigs().then(() => loadSelectedConfig());
+refreshRunList();

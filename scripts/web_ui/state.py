@@ -17,10 +17,10 @@ class ServerState:
         self.run_dir = run_dir
         self.run_config = json.loads((run_dir / "run.json").read_text())
         self.tokenizer = load_tokenizer(run_dir / "tokenizer.json")
-        data_path = self.run_config.get("data_path")
+        data_path = self.run_config.get("inputs", {}).get("data")
         self.data_path = Path(data_path) if data_path else None
         self._tokenizer_report: dict | None = None
-        device_name = device_override if device_override != "auto" else self.run_config.get("device", "auto")
+        device_name = device_override if device_override != "auto" else self.run_config.get("outputs", {}).get("device", "auto")
         self.device = select_device(device_name)
         self.model = self._build_model()
         self.current_checkpoint: str | None = None

@@ -23,10 +23,10 @@ A lightweight, end-to-end text LLM pipeline with clear stages and timestamped ru
 
 ```bash
 # 1) generate arithmetic data
-python -m scripts.data_generate --output-dir data/generated --count 10000 --min-value 0 --max-value 99
+python -m scripts.generate --config configs/generators/arithmetic_small.json
 
 # 2) combine into a single dataset
-python -m scripts.data_combine --inputs data/generated --output-dir data/combined --shuffle
+python -m scripts.data_combine --config configs/combine.json --inputs data/generated --shuffle
 
 # 3) train tokenizer
 python -m scripts.train_tokenizer --config configs/tokenizer.json
@@ -41,14 +41,15 @@ python -m scripts.web_ui
 ## One-command pipeline
 
 ```bash
-python -m scripts.pipeline
+python -m scripts.pipeline --config configs/pipeline.json
 ```
 
-Use `--skip-*` to skip stages, or pass per-stage args like `--generate-count`, `--combine-shuffle`, `--tokenizer-config`, and `--training-config`.
+Use `--set key=value` to override any config field (dot paths supported).
 
 ## Notes
 
-- Training runs save `run.json`, `training_config.json`, `tokenizer.json`, `logs.jsonl`, `samples.jsonl`, and checkpoints inside `runs/train/<timestamp>/`.
-- Tokenizer runs save `tokenizer.json` and `run.json` inside `runs/tokenizer/<timestamp>/`.
+- Runs write a uniform `run.json` manifest plus stage-specific artifacts inside their run directories.
+- Training runs save `training_config.json`, `tokenizer.json`, `logs.jsonl`, `samples.jsonl`, and checkpoints inside `runs/train/<timestamp>/`.
+- Tokenizer runs save `tokenizer.json` and `report.json` inside `runs/tokenizer/<timestamp>/`.
 - All data and run artifacts are gitignored by default. Keep only configs and scripts in git.
 - The web UI includes tokenizer stats, loss curves, samples, and basic attention/MLP introspection.

@@ -15,6 +15,34 @@
     <div class="meta" id="runMeta">Loading run...</div>
   </header>
   <main>
+    <section class="grid">
+      <div class="panel">
+        <h2>Pipeline Control</h2>
+        <div class="controls">
+          <select id="configSelect"></select>
+          <button id="loadConfig" class="primary">Load</button>
+          <button id="saveConfig">Save</button>
+          <span class="meta" id="configMeta"></span>
+        </div>
+        <div class="controls">
+          <button class="primary" data-run="pipeline" id="runPipeline">Run Pipeline</button>
+          <button data-run="generate" id="runGenerate">Generate</button>
+          <button data-run="tokenizer" id="runTokenizer">Tokenizer</button>
+          <button data-run="train" id="runTrain">Train</button>
+        </div>
+        <textarea id="configEditor" placeholder="Select a config to edit..." spellcheck="false"></textarea>
+      </div>
+      <div class="panel">
+        <h2>Runs</h2>
+        <div class="controls">
+          <button id="refreshRuns" class="primary">Refresh</button>
+          <span class="meta" id="runsMeta"></span>
+        </div>
+        <div id="runsList" class="runs-list"></div>
+        <div class="meta" id="runDetailMeta"></div>
+        <pre id="runDetail" class="run-detail"></pre>
+      </div>
+    </section>
     <section class="panel">
       <h2>Run</h2>
       <div class="controls">

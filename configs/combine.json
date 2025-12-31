@@ -1,0 +1,7 @@
+{
+  "inputs": [],
+  "output_dir": "data/combined",
+  "shuffle": true,
+  "seed": 1337,
+  "min_chars": 1
+}
