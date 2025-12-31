@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -11,8 +12,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+os.environ.setdefault("KMP_SHM_DISABLE", "1")
+os.environ.setdefault("KMP_USE_SHM", "0")
+
 import torch
 
+from llm_madness.datasets.manifest import create_dataset_manifest
 from llm_madness.utils import find_latest_run, timestamp
 
 from .state import ServerState
@@ -20,6 +25,7 @@ from .state import ServerState
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = BASE_DIR / "templates" / "index.html"
 STATIC_DIR = BASE_DIR / "static"
+REPO_ROOT = BASE_DIR.parents[2]
 
 
 STATE: ServerState | None = None
@@ -28,6 +34,7 @@ RUNS_DIR = Path("runs/train")
 CONFIGS_DIR = Path("configs")
 RUNS_ROOT = Path("runs")
 DATA_ROOT = Path("data")
+DATASETS_DIR = RUNS_ROOT / "datasets"
 RUN_PROCS: dict[str, dict] = {}
 
 
@@ -102,12 +109,15 @@ def normalize_status(status: str | None) -> str:
     return lowered
 
 
+def is_any_run_active() -> bool:
+    return any(info["process"].poll() is None for info in RUN_PROCS.values())
+
+
 def infer_stage(run_dir: Path, manifest: dict | None) -> str:
     if manifest and manifest.get("stage"):
         return manifest["stage"]
     stage = run_dir.parent.name
-    mapping = {"generated": "generate", "combined": "combine"}
-    return mapping.get(stage, stage or "unknown")
+    return stage or "unknown"
 
 
 def run_is_active(run_id: str) -> bool:
@@ -191,6 +201,70 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path.startswith("/api/data/list"):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            rel = params.get("path", [""])[0]
+            rel = rel.strip().lstrip("/")
+            target = (DATA_ROOT / rel).resolve()
+            if DATA_ROOT.resolve() not in target.parents and target != DATA_ROOT.resolve():
+                self._send_json({"error": "invalid data path"}, status=400)
+                return
+            if not target.exists() or not target.is_dir():
+                self._send_json({"error": "path not found"}, status=404)
+                return
+            entries = []
+            for child in sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+                if child.name.startswith("."):
+                    continue
+                if child.is_dir():
+                    entries.append(
+                        {
+                            "name": child.name,
+                            "type": "dir",
+                            "rel_path": str(child.relative_to(DATA_ROOT)),
+                        }
+                    )
+                elif child.is_file() and child.suffix.lower() == ".txt":
+                    entries.append(
+                        {
+                            "name": child.name,
+                            "type": "file",
+                            "rel_path": str(child.relative_to(DATA_ROOT)),
+                            "size_bytes": child.stat().st_size,
+                        }
+                    )
+            parent = None
+            if target != DATA_ROOT.resolve():
+                parent = str(target.parent.relative_to(DATA_ROOT))
+            self._send_json({"path": rel, "parent": parent, "entries": entries})
+            return
+        if self.path == "/api/datasets":
+            datasets = []
+            if DATASETS_DIR.exists():
+                for run_dir in sorted(DATASETS_DIR.iterdir(), reverse=True):
+                    if not run_dir.is_dir():
+                        continue
+                    manifest_path = run_dir / "dataset_manifest.json"
+                    if not manifest_path.exists():
+                        continue
+                    try:
+                        manifest = json.loads(manifest_path.read_text())
+                    except json.JSONDecodeError:
+                        continue
+                    datasets.append(
+                        {
+                            "id": manifest.get("id") or run_dir.name,
+                            "name": manifest.get("name"),
+                            "created_at": manifest.get("created_at"),
+                            "file_count": manifest.get("file_count"),
+                            "total_bytes": manifest.get("total_bytes"),
+                            "manifest_path": str(manifest_path),
+                            "snapshot_path": manifest.get("snapshot_path"),
+                        }
+                    )
+            self._send_json({"datasets": datasets})
+            return
         if self.path.startswith("/api/run/stream"):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
@@ -361,10 +435,41 @@ class Handler(BaseHTTPRequestHandler):
                 target.write_text(raw)
                 self._send_json({"status": "saved", "name": name})
                 return
+            if self.path == "/api/datasets/create":
+                payload = self._read_json()
+                selections = payload.get("selections", [])
+                name = payload.get("name") or None
+                enable_hashes = bool(payload.get("enable_content_hashes", False))
+                if not isinstance(selections, list) or not selections:
+                    self._send_json({"error": "selections required"}, status=400)
+                    return
+                result = create_dataset_manifest(
+                    name=name,
+                    selections=[str(item) for item in selections],
+                    data_root=DATA_ROOT,
+                    runs_root=RUNS_ROOT,
+                    enable_content_hashes=enable_hashes,
+                    repo_root=REPO_ROOT,
+                )
+                self._send_json(
+                    {
+                        "status": "created",
+                        "dataset_id": result["run_dir"].name,
+                        "manifest_path": str(result["manifest_path"]),
+                        "snapshot_path": str(result["snapshot_path"]),
+                        "file_count": result["manifest"]["file_count"],
+                        "total_bytes": result["manifest"]["total_bytes"],
+                    }
+                )
+                return
             if self.path == "/api/run":
+                if is_any_run_active():
+                    self._send_json({"error": "another run is active; stop it first"}, status=400)
+                    return
                 payload = self._read_json()
                 stage = payload.get("stage", "pipeline")
                 config_name = payload.get("config", "pipeline.json")
+                dataset_manifest = payload.get("dataset_manifest")
                 if config_name.startswith("configs/"):
                     config_name = config_name[len("configs/"):]
                 config_path = (CONFIGS_DIR / config_name).resolve()
@@ -374,6 +479,16 @@ class Handler(BaseHTTPRequestHandler):
                 if not config_path.exists():
                     self._send_json({"error": "config not found"}, status=404)
                     return
+                dataset_manifest_path = None
+                if dataset_manifest:
+                    candidate = Path(str(dataset_manifest)).resolve()
+                    if RUNS_ROOT.resolve() not in candidate.parents:
+                        self._send_json({"error": "invalid dataset manifest path"}, status=400)
+                        return
+                    if not candidate.exists():
+                        self._send_json({"error": "dataset manifest not found"}, status=404)
+                        return
+                    dataset_manifest_path = candidate
                 run_id = timestamp()
                 cmd = [sys.executable, "-m"]
                 if stage == "pipeline":
@@ -381,23 +496,25 @@ class Handler(BaseHTTPRequestHandler):
                     run_dir = RUNS_ROOT / "pipeline" / run_id
                 elif stage == "tokenizer":
                     cmd += ["scripts.train_tokenizer", "--config", str(config_path), "--set", f"run.id={run_id}"]
+                    if dataset_manifest_path is not None:
+                        cmd += ["--dataset-manifest", str(dataset_manifest_path)]
                     run_dir = Path("runs/tokenizer") / run_id
                 elif stage == "train":
                     cmd += ["scripts.train_model", "--config", str(config_path), "--set", f"run.id={run_id}"]
+                    if dataset_manifest_path is not None:
+                        cmd += ["--dataset-manifest", str(dataset_manifest_path)]
                     run_dir = Path("runs/train") / run_id
-                elif stage == "generate":
-                    cmd += ["scripts.generate", "--config", str(config_path), "--set", f"run.id={run_id}"]
-                    run_dir = Path("data/generated") / run_id
-                elif stage == "combine":
-                    cmd += ["scripts.data_combine", "--config", str(config_path), "--set", f"run.id={run_id}"]
-                    run_dir = Path("data/combined") / run_id
                 else:
                     self._send_json({"error": f"unknown stage '{stage}'"}, status=400)
                     return
                 run_dir.mkdir(parents=True, exist_ok=True)
                 log_path = run_dir / "process.log"
                 log_file = log_path.open("a")
-                proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT)
+                env = os.environ.copy()
+                env.setdefault("TOKENIZERS_PARALLELISM", "false")
+                env.setdefault("KMP_SHM_DISABLE", "1")
+                env.setdefault("KMP_USE_SHM", "0")
+                proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
                 RUN_PROCS[run_id] = {"process": proc, "stage": stage, "run_dir": str(run_dir)}
                 self._send_json({"run_id": run_id, "run_dir": str(run_dir), "stage": stage})
                 return
@@ -550,11 +667,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/inspect":
                 payload = self._read_json()
                 ids = payload.get("ids", [])
-                layer = int(payload.get("layer", 0))
-                head = int(payload.get("head", 0))
-                mode = payload.get("mode", "attention")
                 top_k = int(payload.get("top_k", 10))
-                result = STATE.inspect(ids, layer, head, mode, top_k)
+                result = STATE.inspect(ids, top_k)
                 self._send_json(result)
                 return
             self._send_json({"error": "unknown endpoint"}, status=404)

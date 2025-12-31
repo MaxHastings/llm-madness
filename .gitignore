@@ -6,6 +6,10 @@
 !/runs/.gitkeep
 !/runs/**/.gitkeep
 
+# user-owned scripts (keep folder, ignore contents)
+/user_scripts/**
+!/user_scripts/.gitkeep
+
 # python
 __pycache__/
 *.py[cod]

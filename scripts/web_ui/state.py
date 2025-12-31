@@ -10,8 +10,6 @@ from llm_madness.model import GPT, GPTConfig
 from llm_madness.tokenizer import load_tokenizer
 from llm_madness.utils import find_latest_run
 
-from .inspect import attention_from_trace, mlp_from_trace
-
 
 class ServerState:
     def __init__(self, run_dir: Path, checkpoint: str | None, device_override: str):
@@ -154,7 +152,7 @@ class ServerState:
     def ids_to_tokens(self, ids: list[int]) -> list[str]:
         return [self.tokenizer.id_to_token(idx) for idx in ids]
 
-    def inspect(self, ids: list[int], layer: int, head: int, mode: str, top_k: int) -> dict:
+    def inspect(self, ids: list[int], top_k: int) -> dict:
         if not ids:
             return {"error": "no ids provided"}
         max_len = min(len(ids), self.model.config.block_size, 64)
@@ -162,48 +160,26 @@ class ServerState:
         idx = torch.tensor([ids], dtype=torch.long, device=self.device)
         self.model.eval()
         tokens = [self.tokenizer.id_to_token(i) for i in ids]
-        if mode == "attention":
-            with torch.no_grad():
-                _, trace = self.model.forward_with_trace(idx)
-            layer_idx, head_idx, matrix, min_val, max_val = attention_from_trace(trace, layer, head)
-            return {
-                "attention": matrix,
-                "tokens": tokens,
-                "meta": f"layer {layer_idx} head {head_idx} tokens {len(tokens)}",
-                "min_val": min_val,
-                "max_val": max_val,
-            }
-        if mode == "mlp":
-            with torch.no_grad():
-                _, trace = self.model.forward_with_trace(idx)
-            layer_idx, activations = mlp_from_trace(trace, layer, top_k)
-            return {
-                "activations": activations,
-                "tokens": tokens,
-                "meta": f"layer {layer_idx} token {len(tokens) - 1}",
-            }
-        if mode == "layer_topk":
-            with torch.no_grad():
-                _, hidden_states = self.model.forward_with_hidden_states(idx)
-            results = []
-            for layer_idx, hidden in enumerate(hidden_states):
-                layer_hidden = self.model.ln_f(hidden)
-                logits = self.model.head(layer_hidden)[:, -1, :]
-                probs = torch.softmax(logits, dim=-1)
-                values, indices = torch.topk(probs, k=min(top_k, probs.size(-1)))
-                topk = []
-                for prob, token_id in zip(values[0], indices[0]):
-                    tid = int(token_id.item())
-                    topk.append(
-                        {
-                            "id": tid,
-                            "token": self.tokenizer.id_to_token(tid),
-                            "prob": float(prob.item()),
-                        }
-                    )
-                results.append({"layer": layer_idx, "topk": topk})
-            return {"layers": results, "tokens": tokens, "meta": f"layers {len(results)}"}
-        return {"error": f"unknown mode: {mode}"}
+        with torch.no_grad():
+            _, hidden_states = self.model.forward_with_hidden_states(idx)
+        results = []
+        for layer_idx, hidden in enumerate(hidden_states):
+            layer_hidden = self.model.ln_f(hidden)
+            logits = self.model.head(layer_hidden)[:, -1, :]
+            probs = torch.softmax(logits, dim=-1)
+            values, indices = torch.topk(probs, k=min(top_k, probs.size(-1)))
+            topk = []
+            for prob, token_id in zip(values[0], indices[0]):
+                tid = int(token_id.item())
+                topk.append(
+                    {
+                        "id": tid,
+                        "token": self.tokenizer.id_to_token(tid),
+                        "prob": float(prob.item()),
+                    }
+                )
+            results.append({"layer": layer_idx, "topk": topk})
+        return {"layers": results, "tokens": tokens, "meta": f"layers {len(results)}"}
 
     def load_checkpoint(self, checkpoint: str | None) -> None:
         if checkpoint is None:

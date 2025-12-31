@@ -5,6 +5,7 @@ import { initSession } from './modules/session.js';
 import { initPrompt } from './modules/prompt.js';
 import { initTraining } from './modules/training.js';
 import { initInspect } from './modules/inspect.js';
+import { initDatasets } from './modules/datasets.js';
 
 initNav();
 initSession();
@@ -13,3 +14,4 @@ initTraining();
 initInspect();
 initPipeline();
 initRuns();
+initDatasets();

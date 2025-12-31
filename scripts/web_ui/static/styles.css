@@ -209,12 +209,51 @@ button.token-btn:hover {
   white-space: pre-wrap;
 }
 
-.heatmap {
-  width: 100%;
-  height: 240px;
+.file-list {
+  display: grid;
+  gap: 6px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fcfaf6;
+  padding: 8px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.file-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.file-spacer {
+  width: 20px;
+}
+
+.file-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: default;
+}
+
+.file-name.file-dir {
+  cursor: pointer;
+  color: var(--accent-2);
+}
+
+.file-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.dataset-manifest {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fcfaf6;
+  margin-bottom: 8px;
 }
 
 .runs-list {

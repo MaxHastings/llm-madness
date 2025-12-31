@@ -2,6 +2,29 @@ import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
 import { refreshRunList } from './runs.js';
 
+function formatDatasetLabel(item) {
+  if (!item) return '';
+  const name = item.name ? `${item.name} (${item.id})` : item.id;
+  const count = item.file_count != null ? `files ${item.file_count}` : 'files ?';
+  return `${name} — ${count}`;
+}
+
+async function loadDatasets() {
+  const data = await fetchJson('/api/datasets');
+  const items = data.datasets || [];
+  els.datasetSelect.innerHTML = '';
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = 'No dataset (use defaults)';
+  els.datasetSelect.appendChild(none);
+  items.forEach((item) => {
+    const opt = document.createElement('option');
+    opt.value = item.manifest_path;
+    opt.textContent = formatDatasetLabel(item);
+    els.datasetSelect.appendChild(opt);
+  });
+}
+
 async function loadConfigs() {
   const data = await api('/api/configs');
   els.configSelect.innerHTML = '';
@@ -56,7 +79,12 @@ async function startRun(stage) {
   if (!name) return;
   const ok = await saveSelectedConfig();
   if (!ok) return;
-  const data = await api('/api/run', { stage, config: name });
+  const payload = { stage, config: name };
+  if (stage === 'tokenizer' || stage === 'train') {
+    const datasetManifest = els.datasetSelect.value;
+    if (datasetManifest) payload.dataset_manifest = datasetManifest;
+  }
+  const data = await api('/api/run', payload);
   els.configMeta.textContent = data.run_id ? `started ${stage} (${data.run_id})` : data.error || 'run failed';
   await refreshRunList();
 }
@@ -66,8 +94,9 @@ export function initPipeline() {
   els.saveConfigBtn.addEventListener('click', saveSelectedConfig);
   els.configSelect.addEventListener('change', loadSelectedConfig);
   els.runPipelineBtn.addEventListener('click', () => startRun('pipeline'));
-  els.runGenerateBtn.addEventListener('click', () => startRun('generate'));
   els.runTokenizerBtn.addEventListener('click', () => startRun('tokenizer'));
   els.runTrainBtn.addEventListener('click', () => startRun('train'));
+  els.refreshDatasetsBtn.addEventListener('click', loadDatasets);
   loadConfigs().then(loadSelectedConfig);
+  loadDatasets();
 }

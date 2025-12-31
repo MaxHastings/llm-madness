@@ -1,31 +1,17 @@
 {
   "run": { "name": "baseline", "tags": ["v1"] },
   "paths": { "data_root": "data", "runs_root": "runs" },
-  "generate": {
-    "enabled": true,
-    "generator": "arithmetic",
-    "config": "configs/generators/arithmetic_large.json",
-    "output_dir": "data/generated"
-  },
-  "combine": {
-    "enabled": true,
-    "inputs": ["${generate.output_dir}/latest"],
-    "output_dir": "data/combined",
-    "shuffle": true,
-    "seed": 1337,
-    "min_chars": 1
-  },
   "tokenizer": {
     "enabled": true,
     "config": "configs/tokenizer.json",
-    "input": "${combine.output_dir}/latest/combined.txt",
+    "input": null,
     "output_dir": "runs/tokenizer"
   },
   "train": {
     "enabled": true,
     "config": "configs/training.json",
-    "data": "${combine.output_dir}/latest/combined.txt",
-    "tokenizer": "${tokenizer.output_dir}/latest/tokenizer.json",
+    "data": null,
+    "tokenizer": null,
     "output_dir": "runs/train"
   }
 }

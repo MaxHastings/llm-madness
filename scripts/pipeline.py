@@ -5,14 +5,12 @@ import argparse
 from pathlib import Path
 
 from llm_madness.config import load_config
-from llm_madness.stages import run_pipeline
+from llm_madness.stages.pipeline import run_pipeline
 
 
 DEFAULT_PIPELINE_CONFIG = {
     "run": {"name": None, "tags": []},
     "paths": {"data_root": "data", "runs_root": "runs"},
-    "generate": {"enabled": True},
-    "combine": {"enabled": True},
     "tokenizer": {"enabled": True},
     "train": {"enabled": True},
 }

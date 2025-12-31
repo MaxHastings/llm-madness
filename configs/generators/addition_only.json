@@ -1,9 +1,0 @@
-{
-  "seed": 1234,
-  "count": 10000,
-  "min_value": 0,
-  "max_value": 99,
-  "addition": true,
-  "subtraction": false,
-  "allow_negative": false
-}
