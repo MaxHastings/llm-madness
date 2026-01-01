@@ -285,6 +285,8 @@
           <div class="controls">
             <button id="tokenizeBtn" class="primary">Tokenize</button>
             <button id="decodeBtn">Decode</button>
+            <label>Greedy steps <input id="inspectRolloutCount" type="number" value="32" min="1" max="256" /></label>
+            <button id="inspectRolloutBtn">Roll out</button>
           </div>
           <textarea id="promptInput" placeholder="Type a prompt..." spellcheck="false"></textarea>
           <div class="meta" id="promptMeta"></div>
@@ -316,8 +318,6 @@
         <div class="controls">
           <label>Top-k <input id="inspectTopK" type="number" value="8" min="1" max="50" /></label>
           <button id="inspectBtn" class="primary">Inspect</button>
-          <label>Greedy steps <input id="inspectRolloutCount" type="number" value="32" min="1" max="256" /></label>
-          <button id="inspectRolloutBtn">Roll out</button>
         </div>
         <div id="inspectMeta" class="meta"></div>
         <div id="inspectRolloutMeta" class="meta"></div>
