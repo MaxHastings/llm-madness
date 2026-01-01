@@ -37,6 +37,7 @@ export const els = {
   inspectorActiveToken: byId('inspectorActiveToken'),
   runSetupMeta: byId('runSetupMeta'),
   runCreateBtn: byId('runCreate'),
+  runName: byId('runName'),
   runsMeta: byId('runsMeta'),
   refreshRunsBtn: byId('refreshRuns'),
   runsSearch: byId('runsSearch'),

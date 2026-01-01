@@ -112,6 +112,7 @@ async function createTrainRun() {
   const datasetManifest = els.datasetSelect.value;
   const tokenizerPath = els.runTokenizerVocabSelect.value;
   const trainingConfig = els.trainingConfigSelect.value;
+  const runName = (els.runName?.value || '').trim();
   if (!datasetManifest) {
     els.runSetupMeta.textContent = 'Select a dataset.';
     return;
@@ -129,6 +130,7 @@ async function createTrainRun() {
     config: trainingConfig,
     dataset_manifest: datasetManifest,
     tokenizer_path: tokenizerPath,
+    run_name: runName || null,
   };
   const data = await api('/api/run', payload);
   els.runSetupMeta.textContent = data.run_id ? `started train (${data.run_id})` : data.error || 'run failed';

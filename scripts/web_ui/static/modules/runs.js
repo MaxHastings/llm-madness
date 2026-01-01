@@ -192,7 +192,11 @@ function renderRunRow(item) {
 
   const runId = document.createElement('span');
   runId.className = 'run-id';
-  runId.textContent = item.run_id || 'unknown';
+  if (item.run_name) {
+    runId.textContent = `${item.run_name} • ${item.run_id || 'unknown'}`;
+  } else {
+    runId.textContent = item.run_id || 'unknown';
+  }
 
   const time = document.createElement('span');
   time.className = 'run-time';
@@ -286,6 +290,7 @@ function renderRunDetails(summary, manifest) {
   if (summary) {
     addSection('Overview');
     const rows = [
+      ['Name', summary.run_name],
       ['Stage', summary.stage],
       ['Status', summary.status],
       ['Run ID', summary.run_id],

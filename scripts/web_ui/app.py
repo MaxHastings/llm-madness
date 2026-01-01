@@ -208,11 +208,17 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
         duration_seconds = None
     duration = format_duration(duration_seconds)
     last_log = read_last_line(run_dir / "logs.jsonl") or read_last_line(run_dir / "process.log")
+    run_name = None
+    if manifest and isinstance(manifest.get("config"), dict):
+        meta = manifest.get("config", {}).get("meta", {})
+        if isinstance(meta, dict):
+            run_name = meta.get("name") or None
     return {
         "run_id": run_id,
         "run_dir": str(run_dir),
         "stage": stage,
         "status": status,
+        "run_name": run_name,
         "start_time": start_time,
         "end_time": end_time,
         "duration": duration,
