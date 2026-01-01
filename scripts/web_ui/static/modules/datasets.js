@@ -3,6 +3,7 @@ import { els } from './dom.js';
 
 let currentPath = '';
 const selections = new Set();
+let selectedManifestPath = null;
 
 function formatBytes(bytes) {
   if (bytes == null) return '-';
@@ -54,12 +55,11 @@ function renderManifestFiles(files) {
 }
 
 function setPreviewTab(tab) {
-  const tabs = els.datasetPreviewTabs?.querySelectorAll('.tab') || [];
-  const previewRoot = els.datasetPreviewTabs?.closest('.dataset-preview');
+  const previewRoot = els.datasetPreviewSelect?.closest('.dataset-preview');
   const panels = previewRoot ? previewRoot.querySelectorAll('.preview-panel') : [];
-  tabs.forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.tab === tab);
-  });
+  if (els.datasetPreviewSelect) {
+    els.datasetPreviewSelect.value = tab;
+  }
   panels.forEach((panel) => {
     panel.classList.toggle('is-hidden', panel.dataset.preview !== tab);
   });
@@ -70,6 +70,8 @@ async function viewManifest(path) {
   try {
     const data = await fetchJson(`/api/datasets/manifest?path=${encodeURIComponent(path)}`);
     setManifestPreview(data, `loaded ${data.path || path}`);
+    selectedManifestPath = path;
+    renderSelectedManifest();
   } catch (err) {
     setManifestPreview({ raw: '' }, `failed to load manifest: ${err.message}`);
   }
@@ -81,6 +83,8 @@ async function deleteManifest(runDir) {
   if (!ok) return;
   await api('/api/run/delete', { run_dir: runDir });
   setManifestPreview({ raw: '' }, 'manifest deleted');
+  selectedManifestPath = null;
+  renderSelectedManifest();
   await refreshDatasetManifests();
 }
 
@@ -167,8 +171,15 @@ async function refreshDatasetManifests() {
   }
   items.forEach((item) => {
     const row = document.createElement('div');
-    row.className = 'dataset-manifest';
+    row.className = 'artifact-card selectable-card dataset-manifest-card';
+    row.dataset.manifestPath = item.manifest_path;
+    row.addEventListener('click', () => {
+      selectedManifestPath = item.manifest_path;
+      renderSelectedManifest();
+      viewManifest(item.manifest_path);
+    });
     const title = document.createElement('div');
+    title.className = 'artifact-title';
     title.textContent = item.name ? `${item.name} (${item.id})` : item.id;
     const meta = document.createElement('div');
     meta.className = 'meta';
@@ -178,19 +189,26 @@ async function refreshDatasetManifests() {
     path.textContent = item.manifest_path;
     const actions = document.createElement('div');
     actions.className = 'artifact-actions';
-    const viewBtn = document.createElement('button');
-    viewBtn.textContent = 'View';
-    viewBtn.addEventListener('click', () => viewManifest(item.manifest_path));
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () => deleteManifest(item.run_dir));
-    actions.appendChild(viewBtn);
+    deleteBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteManifest(item.run_dir);
+    });
     actions.appendChild(deleteBtn);
     row.appendChild(title);
     row.appendChild(meta);
     row.appendChild(path);
     row.appendChild(actions);
     els.datasetManifestList.appendChild(row);
+  });
+  renderSelectedManifest();
+}
+
+function renderSelectedManifest() {
+  const rows = els.datasetManifestList.querySelectorAll('.dataset-manifest-card');
+  rows.forEach((row) => {
+    row.classList.toggle('selected', row.dataset.manifestPath === selectedManifestPath);
   });
 }
 
@@ -217,11 +235,9 @@ export function initDatasets() {
   els.datasetCreateBtn.addEventListener('click', createManifest);
   els.datasetRefreshBtn.addEventListener('click', () => loadPath(currentPath));
   els.datasetRefreshManifestsBtn.addEventListener('click', refreshDatasetManifests);
-  if (els.datasetPreviewTabs) {
-    els.datasetPreviewTabs.addEventListener('click', (event) => {
-      const btn = event.target.closest('.tab');
-      if (!btn) return;
-      setPreviewTab(btn.dataset.tab);
+  if (els.datasetPreviewSelect) {
+    els.datasetPreviewSelect.addEventListener('change', (event) => {
+      setPreviewTab(event.target.value);
     });
   }
   renderSelections();

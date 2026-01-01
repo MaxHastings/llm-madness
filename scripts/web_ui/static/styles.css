@@ -115,9 +115,39 @@ main {
   grid-template-rows: auto 1fr;
 }
 
+.vocabs-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.15fr) minmax(320px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.vocab-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.vocab-preview {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
 .preview-tabs {
   display: inline-flex;
   gap: 6px;
+}
+
+.tab-select {
+  border-radius: 999px;
+  padding: 6px 28px 6px 12px;
+  border: 1px solid var(--border);
+  background: #f3ede3;
+  font-size: 11px;
+  font-family: var(--sans);
 }
 
 .preview-tabs .tab {
@@ -146,6 +176,85 @@ main {
 .dataset-preview textarea {
   min-height: 360px;
   height: 100%;
+}
+
+.vocab-preview textarea {
+  min-height: 320px;
+  height: 100%;
+}
+
+.selectable-card {
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+}
+
+.selectable-card.selected {
+  border-color: var(--accent-2);
+  background: #fff3e4;
+  box-shadow: 0 10px 20px rgba(145, 94, 38, 0.08);
+}
+
+.vocab-list {
+  display: grid;
+  gap: 8px;
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+#datasetManifestList {
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.vocab-summary {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.progress-line {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 36px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink);
+  background: #fcfaf6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.token-listing {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fcfaf6;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  max-height: 360px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.token-row {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.token-id {
+  color: var(--muted);
+}
+
+.token-value {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .manifest-files {
@@ -412,13 +521,6 @@ button.token-btn:hover {
   color: var(--muted);
 }
 
-.dataset-manifest {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px;
-  background: #fcfaf6;
-  margin-bottom: 8px;
-}
 
 .runs-list {
   display: grid;
@@ -814,6 +916,15 @@ button.token-btn:hover {
   }
 
   .dataset-preview {
+    position: static;
+    max-height: none;
+  }
+
+  .vocabs-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .vocab-preview {
     position: static;
     max-height: none;
   }

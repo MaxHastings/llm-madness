@@ -30,6 +30,8 @@ def run_tokenizer(
     )
     config_path = run_dir / "tokenizer_config.json"
     try:
+        print(f"[tokenizer] run_dir {run_dir}", flush=True)
+        print(f"[tokenizer] input {input_path}", flush=True)
         report = train_bpe_tokenizer(
             input_path=input_path,
             output_path=output_path,
@@ -41,9 +43,11 @@ def run_tokenizer(
             byte_level=bool(config.get("byte_level", True)),
             split_digits=bool(config.get("split_digits", False)),
         )
+        print("[tokenizer] writing report", flush=True)
         write_json(config_path, config)
         write_json(run_dir / "report.json", report)
         finish_manifest(run_dir, "complete", outputs={"tokenizer": str(output_path)})
+        print("[tokenizer] run complete", flush=True)
     except Exception as exc:
         finish_manifest(run_dir, "failed", error=str(exc))
         raise

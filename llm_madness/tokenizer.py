@@ -32,10 +32,13 @@ def train_bpe_tokenizer(
     split_digits: bool = False,
 ) -> dict:
     input_path = Path(input_path)
+    print(f"[tokenizer] loading input {input_path}", flush=True)
     text = input_path.read_text()
+    print(f"[tokenizer] input length {len(text)} chars", flush=True)
 
     discovered: list[str] = []
     if discover_regex:
+        print("[tokenizer] discovering special tokens", flush=True)
         discovered = discover_special_tokens(text, discover_regex)
 
     special_tokens = list(special_tokens or [])
@@ -43,6 +46,7 @@ def train_bpe_tokenizer(
         if token not in special_tokens:
             special_tokens.append(token)
 
+    print(f"[tokenizer] training bpe vocab_size={vocab_size} min_freq={min_frequency}", flush=True)
     tokenizer = Tokenizer(BPE(unk_token=special_tokens[0] if special_tokens else "<|unk|>"))
     pre_tokenizers = []
     if split_digits:
@@ -62,7 +66,9 @@ def train_bpe_tokenizer(
         show_progress=True,
     )
     tokenizer.train([str(input_path)], trainer)
+    print("[tokenizer] training complete, saving tokenizer", flush=True)
     tokenizer.save(str(output_path))
+    print(f"[tokenizer] saved {output_path}", flush=True)
     return {
         "input_path": str(input_path),
         "vocab_size": vocab_size,

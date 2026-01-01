@@ -49,18 +49,75 @@ function formatRunLabel(runDir) {
 }
 
 let logStream = null;
+let selectedRunDir = null;
+let activeVocabTab = 'report';
+let tokenSearchTimer = null;
+let progressLines = [];
+let progressTimer = null;
+let progressStart = null;
 
 function setVocabDetails(payload, label) {
-  const raw = payload?.raw || JSON.stringify(payload ?? {}, null, 2);
-  els.tokenizerVocabDetails.value = raw || '';
+  if (payload && Object.prototype.hasOwnProperty.call(payload, 'raw')) {
+    els.tokenizerVocabDetails.value = payload.raw || '';
+    els.tokenizerVocabConfig.value = '';
+    els.tokenizerVocabDetailsMeta.textContent = label || '';
+    els.tokenizerVocabConfigMeta.textContent = '';
+    return;
+  }
+  const report = payload?.report ?? payload ?? {};
+  const manifest = payload?.manifest ?? null;
+  const view = manifest ? { report, manifest } : report;
+  const config = payload?.config ?? {};
+  els.tokenizerVocabDetails.value = JSON.stringify(view, null, 2);
+  els.tokenizerVocabConfig.value = JSON.stringify(config, null, 2);
   els.tokenizerVocabDetailsMeta.textContent = label || '';
+  els.tokenizerVocabConfigMeta.textContent = Object.keys(config || {}).length ? 'config loaded' : '';
 }
 
-function appendLogLine(line) {
-  const next = `${els.tokenizerVocabLogs.value}${els.tokenizerVocabLogs.value ? '\n' : ''}${line}`;
-  const maxChars = 20000;
-  els.tokenizerVocabLogs.value = next.length > maxChars ? next.slice(-maxChars) : next;
-  els.tokenizerVocabLogs.scrollTop = els.tokenizerVocabLogs.scrollHeight;
+function setVocabTab(tab) {
+  const previewRoot = els.tokenizerVocabTabSelect?.closest('.vocab-preview');
+  const panels = previewRoot ? previewRoot.querySelectorAll('.preview-panel') : [];
+  activeVocabTab = tab;
+  if (els.tokenizerVocabTabSelect) {
+    els.tokenizerVocabTabSelect.value = tab;
+  }
+  panels.forEach((panel) => {
+    panel.classList.toggle('is-hidden', panel.dataset.preview !== tab);
+  });
+  if (tab === 'tokens') {
+    loadVocabTokens();
+  }
+}
+
+function updateProgressLine(line) {
+  if (!els.tokenizerVocabProgressLine) return;
+  if (line) {
+    progressLines.push(line);
+    if (progressLines.length > 6) {
+      progressLines = progressLines.slice(-6);
+    }
+  }
+  els.tokenizerVocabProgressLine.textContent = progressLines.join('\n');
+  if (line && line.includes('[tokenizer] run complete')) {
+    setProgressMeta('generation complete');
+    stopLogStream();
+  }
+}
+
+function formatElapsed(startMs) {
+  if (!startMs) return '';
+  const delta = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+  const minutes = Math.floor(delta / 60);
+  const seconds = delta % 60;
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+function setProgressMeta(label) {
+  if (!els.tokenizerVocabProgressMeta) return;
+  els.tokenizerVocabProgressMeta.textContent = label || '';
 }
 
 function stopLogStream() {
@@ -68,19 +125,28 @@ function stopLogStream() {
     logStream.close();
     logStream = null;
   }
+  if (progressTimer) {
+    window.clearInterval(progressTimer);
+    progressTimer = null;
+  }
 }
 
 function startLogStream(runDir) {
   if (!runDir) return;
   stopLogStream();
-  els.tokenizerVocabLogs.value = '';
-  els.tokenizerVocabLogsMeta.textContent = `streaming logs for ${runDir}`;
+  progressLines = [];
+  progressStart = Date.now();
+  setProgressMeta(`generating vocab • ${runDir}`);
+  updateProgressLine('[tokenizer] waiting for output...');
+  progressTimer = window.setInterval(() => {
+    setProgressMeta(`generating vocab • ${runDir} • ${formatElapsed(progressStart)}`);
+  }, 1000);
   logStream = new EventSource(`/api/run/stream?run_dir=${encodeURIComponent(runDir)}&kind=process`);
   logStream.onmessage = (event) => {
-    if (event.data) appendLogLine(event.data);
+    if (event.data) updateProgressLine(event.data);
   };
   logStream.onerror = () => {
-    els.tokenizerVocabLogsMeta.textContent = 'log stream disconnected';
+    setProgressMeta('generation stream disconnected');
     stopLogStream();
   };
 }
@@ -98,6 +164,11 @@ async function viewVocab(runDir) {
     const datasetManifest = data?.manifest?.inputs?.dataset_manifest;
     const label = datasetManifest ? `loaded ${runDir} • dataset ${datasetManifest}` : `loaded ${runDir}`;
     setVocabDetails(payload, label);
+    selectedRunDir = runDir;
+    renderSelectedRun();
+    if (activeVocabTab === 'tokens') {
+      loadVocabTokens();
+    }
   } catch (err) {
     setVocabDetails({ raw: '' }, `failed to load vocab: ${err.message}`);
   }
@@ -109,7 +180,67 @@ async function deleteVocab(runDir) {
   if (!ok) return;
   await api('/api/run/delete', { run_dir: runDir });
   setVocabDetails({ raw: '' }, 'vocab deleted');
+  if (selectedRunDir === runDir) {
+    selectedRunDir = null;
+    renderSelectedRun();
+  }
   await loadVocabList();
+}
+
+function renderSelectedRun() {
+  const rows = els.tokenizerVocabList.querySelectorAll('.vocab-card');
+  rows.forEach((row) => {
+    row.classList.toggle('selected', row.dataset.runDir === selectedRunDir);
+  });
+}
+
+function renderVocabTokens(tokens) {
+  els.tokenizerVocabTokens.innerHTML = '';
+  if (!tokens || !tokens.length) {
+    const empty = document.createElement('div');
+    empty.className = 'meta';
+    empty.textContent = 'No tokens to show.';
+    els.tokenizerVocabTokens.appendChild(empty);
+    return;
+  }
+  tokens.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'token-row';
+    const id = document.createElement('span');
+    id.className = 'token-id';
+    id.textContent = item.id;
+    const token = document.createElement('span');
+    token.className = 'token-value';
+    token.textContent = item.token;
+    row.appendChild(id);
+    row.appendChild(token);
+    els.tokenizerVocabTokens.appendChild(row);
+  });
+}
+
+async function loadVocabTokens() {
+  if (!selectedRunDir) {
+    els.tokenizerVocabTokenMeta.textContent = 'Select a vocab run to view tokens.';
+    els.tokenizerVocabTokens.innerHTML = '';
+    return;
+  }
+  const query = (els.tokenizerVocabTokenSearch.value || '').trim();
+  const limitRaw = parseInt(els.tokenizerVocabTokenLimit.value, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 10), 2000) : 200;
+  els.tokenizerVocabTokenLimit.value = limit;
+  try {
+    const data = await fetchJson(
+      `/api/tokenizer_vocabs/vocab?run_dir=${encodeURIComponent(selectedRunDir)}&q=${encodeURIComponent(query)}&limit=${limit}`
+    );
+    renderVocabTokens(data.tokens || []);
+    const total = data.total ?? 0;
+    const shown = data.shown ?? (data.tokens || []).length;
+    els.tokenizerVocabTokenMeta.textContent = query
+      ? `showing ${shown} of ${total} tokens matching "${query}"`
+      : `showing ${shown} of ${total} tokens`;
+  } catch (err) {
+    els.tokenizerVocabTokenMeta.textContent = `failed to load tokens: ${err.message}`;
+  }
 }
 
 async function loadVocabList() {
@@ -126,7 +257,9 @@ async function loadVocabList() {
   }
   items.forEach((item) => {
     const row = document.createElement('div');
-    row.className = 'artifact-card';
+    row.className = 'artifact-card selectable-card vocab-card';
+    row.dataset.runDir = item.run_dir;
+    row.addEventListener('click', () => viewVocab(item.run_dir));
     const title = document.createElement('div');
     title.className = 'artifact-title';
     title.textContent = item.name ? `${item.name} v${item.version ?? '-'}` : item.run_id;
@@ -134,41 +267,35 @@ async function loadVocabList() {
     datasetTitle.className = 'meta';
     const datasetLabel = formatDatasetTitle(item);
     datasetTitle.textContent = datasetLabel ? `dataset ${datasetLabel}` : formatDatasetLabel(item.dataset_manifest);
-    const vocabMeta = document.createElement('div');
-    vocabMeta.className = 'meta';
-    vocabMeta.textContent = `vocab ${item.vocab_size ?? '-'}`;
-    const tokenMeta = document.createElement('div');
-    tokenMeta.className = 'meta';
-    tokenMeta.textContent = `tokens ${item.token_count ?? '-'}`;
-    const dateMeta = document.createElement('div');
-    dateMeta.className = 'meta';
-    dateMeta.textContent = formatDate(item.created_at);
-    const inputMeta = document.createElement('div');
-    inputMeta.className = 'meta';
-    inputMeta.textContent = item.input_bytes != null ? `input ${formatBytes(item.input_bytes)}` : 'input -';
+    const summary = document.createElement('div');
+    summary.className = 'vocab-summary';
+    const stats = [
+      `vocab ${item.vocab_size ?? '-'}`,
+      `tokens ${item.token_count ?? '-'}`,
+      item.input_bytes != null ? `input ${formatBytes(item.input_bytes)}` : 'input -',
+      formatDate(item.created_at),
+    ];
+    summary.textContent = stats.join(' • ');
     const runMeta = document.createElement('div');
     runMeta.className = 'meta';
     runMeta.textContent = formatRunLabel(item.run_dir);
     const actions = document.createElement('div');
     actions.className = 'artifact-actions';
-    const viewBtn = document.createElement('button');
-    viewBtn.textContent = 'View';
-    viewBtn.addEventListener('click', () => viewVocab(item.run_dir));
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () => deleteVocab(item.run_dir));
-    actions.appendChild(viewBtn);
+    deleteBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteVocab(item.run_dir);
+    });
     actions.appendChild(deleteBtn);
     row.appendChild(title);
     row.appendChild(datasetTitle);
-    row.appendChild(vocabMeta);
-    row.appendChild(tokenMeta);
-    row.appendChild(dateMeta);
-    row.appendChild(inputMeta);
+    row.appendChild(summary);
     row.appendChild(runMeta);
     row.appendChild(actions);
     els.tokenizerVocabList.appendChild(row);
   });
+  renderSelectedRun();
 }
 
 async function loadConfigs() {
@@ -240,10 +367,28 @@ async function createVocab() {
 
 export function initTokenizerVocabs() {
   els.tokenizerVocabRefreshBtn.addEventListener('click', loadVocabList);
+  if (els.tokenizerVocabRefreshListBtn) {
+    els.tokenizerVocabRefreshListBtn.addEventListener('click', loadVocabList);
+  }
   els.tokenizerVocabRefreshConfigsBtn.addEventListener('click', loadConfigs);
   els.tokenizerVocabRefreshDatasetsBtn.addEventListener('click', loadDatasets);
   els.tokenizerVocabCreateBtn.addEventListener('click', createVocab);
+  if (els.tokenizerVocabTabSelect) {
+    els.tokenizerVocabTabSelect.addEventListener('change', (event) => {
+      setVocabTab(event.target.value);
+    });
+  }
+  if (els.tokenizerVocabTokenRefreshBtn) {
+    els.tokenizerVocabTokenRefreshBtn.addEventListener('click', loadVocabTokens);
+  }
+  if (els.tokenizerVocabTokenSearch) {
+    els.tokenizerVocabTokenSearch.addEventListener('input', () => {
+      if (tokenSearchTimer) window.clearTimeout(tokenSearchTimer);
+      tokenSearchTimer = window.setTimeout(loadVocabTokens, 250);
+    });
+  }
   loadVocabList();
   loadConfigs();
   loadDatasets();
+  setVocabTab('report');
 }

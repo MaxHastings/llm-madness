@@ -52,23 +52,16 @@
     </section>
 
     <section class="page-section" data-section="tokenizer-vocabs">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Tokenizer Vocabularies</h2>
-            <p class="meta">Generated artifacts tied to config + dataset.</p>
-          </div>
-          <div class="controls">
-            <button id="tokenizerVocabRefresh" class="primary">Refresh</button>
-          </div>
-        </div>
-        <div class="split">
-          <div class="panel-list">
-            <h3>Vocab Runs</h3>
-            <div id="tokenizerVocabList" class="artifact-list"></div>
-          </div>
-          <div class="panel-editor">
-            <h3>Create New Vocab</h3>
+      <div class="vocabs-layout">
+        <div class="vocab-stack">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Create New Vocab</h2>
+                <p class="meta">Generated artifacts tied to config + dataset.</p>
+              </div>
+              <button id="tokenizerVocabRefresh" class="primary">Refresh</button>
+            </div>
             <div class="controls">
               <select id="tokenizerVocabConfigSelect"></select>
               <button id="tokenizerVocabRefreshConfigs">Refresh Configs</button>
@@ -83,13 +76,49 @@
             <div class="controls">
               <button id="tokenizerVocabCreate" class="primary">Generate Vocab</button>
             </div>
+            <div class="meta" id="tokenizerVocabProgressMeta"></div>
+            <div id="tokenizerVocabProgressLine" class="progress-line"></div>
             <div class="meta" id="tokenizerVocabMeta"></div>
-            <h3>Vocab Details</h3>
-            <div class="meta" id="tokenizerVocabDetailsMeta"></div>
-            <textarea id="tokenizerVocabDetails" readonly spellcheck="false"></textarea>
-            <h3>Tokenizer Logs</h3>
-            <div class="meta" id="tokenizerVocabLogsMeta"></div>
-            <textarea id="tokenizerVocabLogs" readonly spellcheck="false"></textarea>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Vocab Runs</h2>
+              <button id="tokenizerVocabRefreshList" class="primary">Refresh</button>
+            </div>
+            <div id="tokenizerVocabList" class="artifact-list vocab-list"></div>
+          </div>
+        </div>
+        <div class="panel vocab-preview">
+          <div class="panel-head">
+            <div>
+              <h2>Vocab Details</h2>
+              <div class="meta" id="tokenizerVocabDetailsMeta"></div>
+            </div>
+            <div class="preview-tabs">
+              <select id="tokenizerVocabTabSelect" class="tab-select">
+                <option value="report">Report</option>
+                <option value="config">Config</option>
+                <option value="tokens">Tokens</option>
+              </select>
+            </div>
+          </div>
+          <div class="preview-body">
+            <div class="preview-panel" data-preview="report">
+              <textarea id="tokenizerVocabDetails" readonly spellcheck="false"></textarea>
+            </div>
+            <div class="preview-panel is-hidden" data-preview="config">
+              <div class="meta" id="tokenizerVocabConfigMeta"></div>
+              <textarea id="tokenizerVocabConfig" readonly spellcheck="false"></textarea>
+            </div>
+            <div class="preview-panel is-hidden" data-preview="tokens">
+              <div class="controls">
+                <input id="tokenizerVocabTokenSearch" type="text" placeholder="Filter tokens..." />
+                <input id="tokenizerVocabTokenLimit" type="number" min="10" max="2000" value="200" />
+                <button id="tokenizerVocabTokenRefresh" class="primary">Load</button>
+              </div>
+              <div class="meta" id="tokenizerVocabTokenMeta"></div>
+              <div id="tokenizerVocabTokens" class="token-listing"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -238,9 +267,7 @@
             <h3>Selections</h3>
             <div class="meta" id="datasetMeta"></div>
             <textarea id="datasetSelections" readonly spellcheck="false"></textarea>
-          </div>
-          <div class="panel">
-            <h2>Create Dataset Manifest</h2>
+            <h3>Create Dataset Manifest</h3>
             <div class="controls">
               <input id="datasetName" placeholder="Optional name (e.g. wiki-small)" />
               <label class="meta">
@@ -256,7 +283,7 @@
               <h2>Existing Manifests</h2>
               <button id="datasetRefreshManifests" class="primary">Refresh</button>
             </div>
-            <div id="datasetManifestList"></div>
+            <div id="datasetManifestList" class="artifact-list"></div>
           </div>
         </div>
         <div class="panel dataset-preview">
@@ -265,9 +292,11 @@
               <h2>Manifest Preview</h2>
               <div class="meta" id="datasetManifestMeta"></div>
             </div>
-            <div class="preview-tabs" id="datasetPreviewTabs">
-              <button class="tab active" data-tab="manifest">Manifest</button>
-              <button class="tab" data-tab="files">Files</button>
+            <div class="preview-tabs">
+              <select id="datasetPreviewSelect" class="tab-select">
+                <option value="manifest">Manifest</option>
+                <option value="files">Files</option>
+              </select>
             </div>
           </div>
           <div class="preview-body">

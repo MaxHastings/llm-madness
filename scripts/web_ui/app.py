@@ -529,6 +529,83 @@ class Handler(BaseHTTPRequestHandler):
                 }
             )
             return
+        if self.path.startswith("/api/tokenizer_vocabs/vocab"):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            run_dir = params.get("run_dir", [""])[0]
+            query = (params.get("q", [""])[0] or "").strip()
+            limit_raw = params.get("limit", ["200"])[0]
+            if not run_dir:
+                self._send_json({"error": "run_dir required"}, status=400)
+                return
+            try:
+                limit = int(limit_raw)
+            except ValueError:
+                limit = 200
+            limit = max(10, min(limit, 2000))
+            run_path = Path(unquote(run_dir)).resolve()
+            if RUNS_ROOT.resolve() not in run_path.parents:
+                self._send_json({"error": "invalid run path"}, status=400)
+                return
+            if not run_path.exists() or not run_path.is_dir():
+                self._send_json({"error": "run not found"}, status=404)
+                return
+            report_path = run_path / "report.json"
+            tokenizer_path = run_path / "tokenizer.json"
+            if report_path.exists():
+                try:
+                    report = json.loads(report_path.read_text())
+                except json.JSONDecodeError:
+                    report = {}
+                output_path = report.get("output_path") if isinstance(report, dict) else None
+                if output_path:
+                    candidate = Path(output_path).resolve()
+                    if RUNS_ROOT.resolve() in candidate.parents and candidate.is_file():
+                        tokenizer_path = candidate
+            if not tokenizer_path.exists():
+                self._send_json({"error": "tokenizer.json not found"}, status=404)
+                return
+            try:
+                tokenizer_payload = json.loads(tokenizer_path.read_text())
+            except json.JSONDecodeError:
+                self._send_json({"error": "invalid tokenizer.json"}, status=400)
+                return
+            model = tokenizer_payload.get("model", {}) if isinstance(tokenizer_payload, dict) else {}
+            vocab = model.get("vocab", {}) if isinstance(model, dict) else {}
+            vocab_items = []
+            if isinstance(vocab, dict):
+                vocab_items = [{"token": token, "id": idx} for token, idx in vocab.items()]
+            added_tokens = tokenizer_payload.get("added_tokens", []) if isinstance(tokenizer_payload, dict) else []
+            if isinstance(added_tokens, list):
+                existing_tokens = {item["token"] for item in vocab_items}
+                for item in added_tokens:
+                    if not isinstance(item, dict):
+                        continue
+                    token = item.get("content")
+                    token_id = item.get("id")
+                    if token is None or token_id is None:
+                        continue
+                    if token in existing_tokens:
+                        continue
+                    vocab_items.append({"token": token, "id": token_id})
+            vocab_items.sort(key=lambda item: item["id"])
+            total = len(vocab_items)
+            if query:
+                query_lower = query.lower()
+                vocab_items = [
+                    item for item in vocab_items if query_lower in str(item["token"]).lower()
+                ]
+            shown = min(len(vocab_items), limit)
+            self._send_json(
+                {
+                    "run_dir": str(run_path),
+                    "tokenizer_path": str(tokenizer_path),
+                    "total": total,
+                    "shown": shown,
+                    "tokens": vocab_items[:limit],
+                }
+            )
+            return
         if self.path.startswith("/api/run/stream"):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
