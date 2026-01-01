@@ -13,9 +13,6 @@ function updateActiveTokenUI() {
   if (els.inspectorActiveToken) {
     els.inspectorActiveToken.textContent = label;
   }
-  if (els.inspectActiveToken) {
-    els.inspectActiveToken.textContent = '';
-  }
 }
 
 function setActiveToken(index, tokens, ids) {
