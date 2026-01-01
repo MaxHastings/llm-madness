@@ -3,6 +3,8 @@ import { els } from './dom.js';
 
 let configs = [];
 let selectedPath = null;
+let configTab = 'editor';
+let editorTimer = null;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -19,6 +21,95 @@ function slugify(raw) {
 
 function padVersion(value) {
   return `${value}`.padStart(3, '0');
+}
+
+function safeText(value) {
+  if (value === null || value === undefined) return '-';
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
+  return `${value}`;
+}
+
+function formatSortName(item) {
+  return (item.name || item.path || '').toLowerCase();
+}
+
+function formatSortDate(item) {
+  const ts = item.created_at ? Date.parse(item.created_at) : 0;
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function renderKeyValues(container, entries) {
+  container.innerHTML = '';
+  if (!entries.length) {
+    const empty = document.createElement('div');
+    empty.className = 'meta';
+    empty.textContent = 'No details to show.';
+    container.appendChild(empty);
+    return;
+  }
+  entries.forEach(([label, value]) => {
+    const row = document.createElement('div');
+    row.className = 'summary-row';
+    const key = document.createElement('span');
+    key.className = 'summary-key';
+    key.textContent = label;
+    const val = document.createElement('span');
+    val.className = 'summary-value';
+    val.textContent = safeText(value);
+    row.appendChild(key);
+    row.appendChild(val);
+    container.appendChild(row);
+  });
+}
+
+function renderSummary(parsed) {
+  if (!parsed) {
+    renderKeyValues(els.trainingConfigSummary, []);
+    renderKeyValues(els.trainingConfigHyperparams, []);
+    return;
+  }
+  const meta = parsed.meta || {};
+  const training = parsed.training || {};
+  const model = parsed.model || {};
+  renderKeyValues(els.trainingConfigSummary, [
+    ['Name', meta.name],
+    ['Version', meta.version],
+    ['ID', meta.id],
+    ['Parent', meta.parent_id],
+    ['Created', meta.created_at],
+    ['Model', formatModelSummary(model)],
+    ['Seed', parsed.seed],
+    ['Device', training.device],
+    ['Batch size', training.batch_size],
+    ['Max iters', training.max_iters],
+  ]);
+  renderKeyValues(els.trainingConfigHyperparams, [
+    ['Learning rate', training.learning_rate],
+    ['Weight decay', training.weight_decay],
+    ['Warmup iters', training.warmup_iters],
+    ['Grad clip', training.grad_clip],
+    ['Eval interval', training.eval_interval],
+    ['Eval iters', training.eval_iters],
+    ['Log interval', training.log_interval],
+    ['Save interval', training.save_interval],
+    ['Val split', training.val_split],
+    ['Sample length', training.sample_length],
+    ['Sample temperature', training.sample_temperature],
+    ['Sample top-k', training.sample_top_k],
+    ['Dropout', model.dropout],
+  ]);
+}
+
+function setConfigTab(tab) {
+  const previewRoot = els.trainingConfigTabSelect?.closest('.config-editor-panel');
+  const panels = previewRoot ? previewRoot.querySelectorAll('.preview-panel') : [];
+  configTab = tab;
+  if (els.trainingConfigTabSelect) {
+    els.trainingConfigTabSelect.value = tab;
+  }
+  panels.forEach((panel) => {
+    panel.classList.toggle('is-hidden', panel.dataset.preview !== tab);
+  });
 }
 
 function nextVersion(name) {
@@ -65,26 +156,51 @@ function formatModelSummary(item) {
 
 function renderList() {
   els.trainingConfigList.innerHTML = '';
-  if (!configs.length) {
+  const query = (els.trainingConfigSearch?.value || '').trim().toLowerCase();
+  const sortBy = els.trainingConfigSort?.value || 'recent';
+  let items = configs.slice();
+  if (query) {
+    items = items.filter((item) => {
+      const hay = `${item.name || ''} ${item.path || ''}`.toLowerCase();
+      return hay.includes(query);
+    });
+  }
+  if (sortBy === 'name') {
+    items.sort((a, b) => formatSortName(a).localeCompare(formatSortName(b)));
+  } else if (sortBy === 'version') {
+    items.sort((a, b) => {
+      const nameCmp = formatSortName(a).localeCompare(formatSortName(b));
+      if (nameCmp !== 0) return nameCmp;
+      return (b.version || 0) - (a.version || 0);
+    });
+  } else {
+    items.sort((a, b) => formatSortDate(b) - formatSortDate(a));
+  }
+  if (!items.length) {
     const empty = document.createElement('div');
     empty.className = 'meta';
     empty.textContent = 'No training configs yet.';
     els.trainingConfigList.appendChild(empty);
     return;
   }
-  configs.forEach((item) => {
+  items.forEach((item) => {
     const row = document.createElement('div');
-    row.className = 'config-row';
+    row.className = 'artifact-card selectable-card config-card';
     row.dataset.path = item.path;
-    row.classList.toggle('active', item.path === selectedPath);
-    row.innerHTML = `
-      <div class="config-row-main">
-        <span class="config-title">${item.name || item.path}</span>
-        <span class="config-meta">v${item.version ?? '-'} • ${formatModelSummary(item)}</span>
-      </div>
-      <div class="config-row-sub">${formatDate(item.created_at)}</div>
-    `;
+    row.classList.toggle('selected', item.path === selectedPath);
+    const title = document.createElement('div');
+    title.className = 'artifact-title';
+    title.textContent = item.name || item.path;
+    const summary = document.createElement('div');
+    summary.className = 'config-summary';
+    summary.textContent = `v${item.version ?? '-'} • ${formatModelSummary(item)}`;
+    const date = document.createElement('div');
+    date.className = 'meta';
+    date.textContent = formatDate(item.created_at);
     row.addEventListener('click', () => loadConfig(item.path));
+    row.appendChild(title);
+    row.appendChild(summary);
+    row.appendChild(date);
     els.trainingConfigList.appendChild(row);
   });
 }
@@ -104,6 +220,15 @@ async function loadConfig(path) {
   selectedPath = path;
   els.trainingConfigEditor.value = data.raw;
   els.trainingConfigMeta.textContent = `loaded ${path}`;
+  let parsed = data.config;
+  if (!parsed) {
+    try {
+      parsed = JSON.parse(data.raw);
+    } catch (err) {
+      parsed = null;
+    }
+  }
+  renderSummary(parsed);
   renderList();
 }
 
@@ -147,8 +272,10 @@ function newConfigTemplate() {
 
 function startNew() {
   selectedPath = null;
-  els.trainingConfigEditor.value = JSON.stringify(newConfigTemplate(), null, 2);
+  const template = newConfigTemplate();
+  els.trainingConfigEditor.value = JSON.stringify(template, null, 2);
   els.trainingConfigMeta.textContent = 'new training config';
+  renderSummary(template);
   renderList();
 }
 
@@ -173,6 +300,7 @@ async function saveNewVersion() {
   selectedPath = path;
   els.trainingConfigEditor.value = raw;
   els.trainingConfigMeta.textContent = `saved ${path}`;
+  renderSummary(updated);
   await loadList();
   renderList();
 }
@@ -194,6 +322,7 @@ async function duplicateSelected() {
   els.trainingConfigEditor.value = JSON.stringify(parsed.parsed, null, 2);
   selectedPath = null;
   els.trainingConfigMeta.textContent = 'duplicated; save as new version';
+  renderSummary(parsed.parsed);
   renderList();
 }
 
@@ -208,6 +337,7 @@ async function deleteSelected() {
   selectedPath = null;
   els.trainingConfigEditor.value = '';
   els.trainingConfigMeta.textContent = 'deleted';
+  renderSummary(null);
   await loadList();
 }
 
@@ -216,6 +346,26 @@ export function initTrainingConfigs() {
   els.trainingConfigSaveBtn.addEventListener('click', saveNewVersion);
   els.trainingConfigDuplicateBtn.addEventListener('click', duplicateSelected);
   els.trainingConfigDeleteBtn.addEventListener('click', deleteSelected);
+  if (els.trainingConfigSearch) {
+    els.trainingConfigSearch.addEventListener('input', renderList);
+  }
+  if (els.trainingConfigSort) {
+    els.trainingConfigSort.addEventListener('change', renderList);
+  }
+  if (els.trainingConfigTabSelect) {
+    els.trainingConfigTabSelect.addEventListener('change', (event) => {
+      setConfigTab(event.target.value);
+    });
+  }
+  els.trainingConfigEditor.addEventListener('input', () => {
+    if (editorTimer) window.clearTimeout(editorTimer);
+    editorTimer = window.setTimeout(() => {
+      const parsed = parseEditor();
+      if (parsed.ok) {
+        renderSummary(parsed.parsed);
+      }
+    }, 200);
+  });
   loadList().then(() => {
     if (configs.length) {
       loadConfig(configs[0].path);
@@ -223,4 +373,5 @@ export function initTrainingConfigs() {
       startNew();
     }
   });
+  setConfigTab('editor');
 }

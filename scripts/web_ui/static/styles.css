@@ -122,6 +122,23 @@ main {
   align-items: start;
 }
 
+.configs-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.4fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.config-editor-panel {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+}
+
 .vocab-stack {
   display: grid;
   gap: 18px;
@@ -209,6 +226,50 @@ main {
   padding-right: 4px;
 }
 
+.config-list {
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.config-summary {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.config-editor-panel textarea {
+  min-height: 360px;
+  height: 100%;
+}
+
+.summary-grid {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fcfaf6;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  max-height: 360px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.summary-key {
+  color: var(--muted);
+}
+
+.summary-value {
+  color: var(--ink);
+}
 .vocab-summary {
   font-size: 11px;
   color: var(--muted);
@@ -925,6 +986,15 @@ button.token-btn:hover {
   }
 
   .vocab-preview {
+    position: static;
+    max-height: none;
+  }
+
+  .configs-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .config-editor-panel {
     position: static;
     max-height: none;
   }

@@ -24,28 +24,54 @@
     </aside>
     <main>
     <section class="page-section active" data-section="tokenizer-configs">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Tokenizer Configs</h2>
-            <p class="meta">Save every change as a new version.</p>
+      <div class="configs-layout">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Tokenizer Configs</h2>
+              <p class="meta">Save every change as a new version.</p>
+            </div>
           </div>
           <div class="controls">
-            <button id="tokenizerConfigNew" class="primary">New</button>
-            <button id="tokenizerConfigDuplicate">Duplicate</button>
-            <button id="tokenizerConfigSave" class="primary">Save New Version</button>
-            <button id="tokenizerConfigDelete">Delete</button>
+            <input id="tokenizerConfigSearch" type="text" placeholder="Search configs..." />
+            <select id="tokenizerConfigSort" class="tab-select">
+              <option value="recent">Sort: recent</option>
+              <option value="name">Sort: name</option>
+              <option value="version">Sort: version</option>
+            </select>
           </div>
+          <div id="tokenizerConfigList" class="artifact-list config-list"></div>
         </div>
-        <div class="split">
-          <div class="panel-list">
-            <h3>Versions</h3>
-            <div id="tokenizerConfigList" class="config-list"></div>
+        <div class="panel config-editor-panel">
+          <div class="panel-head">
+            <div>
+              <h2>Config Details</h2>
+              <div class="meta" id="tokenizerConfigMeta"></div>
+            </div>
+            <div class="controls">
+              <button id="tokenizerConfigNew" class="primary">New</button>
+              <button id="tokenizerConfigDuplicate">Duplicate</button>
+              <button id="tokenizerConfigSave" class="primary">Save New Version</button>
+              <button id="tokenizerConfigDelete">Delete</button>
+            </div>
           </div>
-          <div class="panel-editor">
-            <h3>Config JSON</h3>
-            <textarea id="tokenizerConfigEditor" spellcheck="false"></textarea>
-            <div class="meta" id="tokenizerConfigMeta"></div>
+          <div class="preview-tabs">
+            <select id="tokenizerConfigTabSelect" class="tab-select">
+              <option value="editor">Editor</option>
+              <option value="summary">Summary</option>
+              <option value="defaults">Defaults</option>
+            </select>
+          </div>
+          <div class="preview-body">
+            <div class="preview-panel" data-preview="editor">
+              <textarea id="tokenizerConfigEditor" spellcheck="false"></textarea>
+            </div>
+            <div class="preview-panel is-hidden" data-preview="summary">
+              <div id="tokenizerConfigSummary" class="summary-grid"></div>
+            </div>
+            <div class="preview-panel is-hidden" data-preview="defaults">
+              <div id="tokenizerConfigDefaults" class="summary-grid"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -125,28 +151,54 @@
     </section>
 
     <section class="page-section" data-section="training-configs">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Training Configs</h2>
-            <p class="meta">Keep every change as a new version.</p>
+      <div class="configs-layout">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Training Configs</h2>
+              <p class="meta">Keep every change as a new version.</p>
+            </div>
           </div>
           <div class="controls">
-            <button id="trainingConfigNew" class="primary">New</button>
-            <button id="trainingConfigDuplicate">Duplicate</button>
-            <button id="trainingConfigSave" class="primary">Save New Version</button>
-            <button id="trainingConfigDelete">Delete</button>
+            <input id="trainingConfigSearch" type="text" placeholder="Search configs..." />
+            <select id="trainingConfigSort" class="tab-select">
+              <option value="recent">Sort: recent</option>
+              <option value="name">Sort: name</option>
+              <option value="version">Sort: version</option>
+            </select>
           </div>
+          <div id="trainingConfigList" class="artifact-list config-list"></div>
         </div>
-        <div class="split">
-          <div class="panel-list">
-            <h3>Versions</h3>
-            <div id="trainingConfigList" class="config-list"></div>
+        <div class="panel config-editor-panel">
+          <div class="panel-head">
+            <div>
+              <h2>Config Details</h2>
+              <div class="meta" id="trainingConfigMeta"></div>
+            </div>
+            <div class="controls">
+              <button id="trainingConfigNew" class="primary">New</button>
+              <button id="trainingConfigDuplicate">Duplicate</button>
+              <button id="trainingConfigSave" class="primary">Save New Version</button>
+              <button id="trainingConfigDelete">Delete</button>
+            </div>
           </div>
-          <div class="panel-editor">
-            <h3>Config JSON</h3>
-            <textarea id="trainingConfigEditor" spellcheck="false"></textarea>
-            <div class="meta" id="trainingConfigMeta"></div>
+          <div class="preview-tabs">
+            <select id="trainingConfigTabSelect" class="tab-select">
+              <option value="editor">Editor</option>
+              <option value="summary">Summary</option>
+              <option value="hyperparams">Hyperparams</option>
+            </select>
+          </div>
+          <div class="preview-body">
+            <div class="preview-panel" data-preview="editor">
+              <textarea id="trainingConfigEditor" spellcheck="false"></textarea>
+            </div>
+            <div class="preview-panel is-hidden" data-preview="summary">
+              <div id="trainingConfigSummary" class="summary-grid"></div>
+            </div>
+            <div class="preview-panel is-hidden" data-preview="hyperparams">
+              <div id="trainingConfigHyperparams" class="summary-grid"></div>
+            </div>
           </div>
         </div>
       </div>

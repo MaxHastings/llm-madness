@@ -83,6 +83,11 @@ export const els = {
   tokenizerConfigSaveBtn: byId('tokenizerConfigSave'),
   tokenizerConfigDuplicateBtn: byId('tokenizerConfigDuplicate'),
   tokenizerConfigDeleteBtn: byId('tokenizerConfigDelete'),
+  tokenizerConfigSearch: byId('tokenizerConfigSearch'),
+  tokenizerConfigSort: byId('tokenizerConfigSort'),
+  tokenizerConfigTabSelect: byId('tokenizerConfigTabSelect'),
+  tokenizerConfigSummary: byId('tokenizerConfigSummary'),
+  tokenizerConfigDefaults: byId('tokenizerConfigDefaults'),
 
   tokenizerVocabList: byId('tokenizerVocabList'),
   tokenizerVocabRefreshBtn: byId('tokenizerVocabRefresh'),
@@ -114,4 +119,9 @@ export const els = {
   trainingConfigSaveBtn: byId('trainingConfigSave'),
   trainingConfigDuplicateBtn: byId('trainingConfigDuplicate'),
   trainingConfigDeleteBtn: byId('trainingConfigDelete'),
+  trainingConfigSearch: byId('trainingConfigSearch'),
+  trainingConfigSort: byId('trainingConfigSort'),
+  trainingConfigTabSelect: byId('trainingConfigTabSelect'),
+  trainingConfigSummary: byId('trainingConfigSummary'),
+  trainingConfigHyperparams: byId('trainingConfigHyperparams'),
 };

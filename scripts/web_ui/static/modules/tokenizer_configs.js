@@ -3,6 +3,8 @@ import { els } from './dom.js';
 
 let configs = [];
 let selectedPath = null;
+let configTab = 'editor';
+let editorTimer = null;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -19,6 +21,83 @@ function slugify(raw) {
 
 function padVersion(value) {
   return `${value}`.padStart(3, '0');
+}
+
+function safeText(value) {
+  if (value === null || value === undefined) return '-';
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
+  return `${value}`;
+}
+
+function formatSortName(item) {
+  return (item.name || item.path || '').toLowerCase();
+}
+
+function formatSortDate(item) {
+  const ts = item.created_at ? Date.parse(item.created_at) : 0;
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function renderKeyValues(container, entries) {
+  container.innerHTML = '';
+  if (!entries.length) {
+    const empty = document.createElement('div');
+    empty.className = 'meta';
+    empty.textContent = 'No details to show.';
+    container.appendChild(empty);
+    return;
+  }
+  entries.forEach(([label, value]) => {
+    const row = document.createElement('div');
+    row.className = 'summary-row';
+    const key = document.createElement('span');
+    key.className = 'summary-key';
+    key.textContent = label;
+    const val = document.createElement('span');
+    val.className = 'summary-value';
+    val.textContent = safeText(value);
+    row.appendChild(key);
+    row.appendChild(val);
+    container.appendChild(row);
+  });
+}
+
+function renderSummary(parsed) {
+  if (!parsed) {
+    renderKeyValues(els.tokenizerConfigSummary, []);
+    renderKeyValues(els.tokenizerConfigDefaults, []);
+    return;
+  }
+  const meta = parsed.meta || {};
+  renderKeyValues(els.tokenizerConfigSummary, [
+    ['Name', meta.name],
+    ['Version', meta.version],
+    ['ID', meta.id],
+    ['Parent', meta.parent_id],
+    ['Created', meta.created_at],
+    ['Algorithm', parsed.algorithm],
+    ['Vocab size', parsed.vocab_size],
+    ['Min frequency', parsed.min_frequency],
+  ]);
+  renderKeyValues(els.tokenizerConfigDefaults, [
+    ['Special tokens', parsed.special_tokens],
+    ['Discover regex', parsed.discover_special_token_regex],
+    ['Add prefix space', parsed.add_prefix_space],
+    ['Byte level', parsed.byte_level],
+    ['Split digits', parsed.split_digits],
+  ]);
+}
+
+function setConfigTab(tab) {
+  const previewRoot = els.tokenizerConfigTabSelect?.closest('.config-editor-panel');
+  const panels = previewRoot ? previewRoot.querySelectorAll('.preview-panel') : [];
+  configTab = tab;
+  if (els.tokenizerConfigTabSelect) {
+    els.tokenizerConfigTabSelect.value = tab;
+  }
+  panels.forEach((panel) => {
+    panel.classList.toggle('is-hidden', panel.dataset.preview !== tab);
+  });
 }
 
 function nextVersion(name) {
@@ -55,27 +134,51 @@ function ensureMeta(parsed, name, parentId) {
 
 function renderList() {
   els.tokenizerConfigList.innerHTML = '';
-  if (!configs.length) {
+  const query = (els.tokenizerConfigSearch?.value || '').trim().toLowerCase();
+  const sortBy = els.tokenizerConfigSort?.value || 'recent';
+  let items = configs.slice();
+  if (query) {
+    items = items.filter((item) => {
+      const hay = `${item.name || ''} ${item.path || ''}`.toLowerCase();
+      return hay.includes(query);
+    });
+  }
+  if (sortBy === 'name') {
+    items.sort((a, b) => formatSortName(a).localeCompare(formatSortName(b)));
+  } else if (sortBy === 'version') {
+    items.sort((a, b) => {
+      const nameCmp = formatSortName(a).localeCompare(formatSortName(b));
+      if (nameCmp !== 0) return nameCmp;
+      return (b.version || 0) - (a.version || 0);
+    });
+  } else {
+    items.sort((a, b) => formatSortDate(b) - formatSortDate(a));
+  }
+  if (!items.length) {
     const empty = document.createElement('div');
     empty.className = 'meta';
     empty.textContent = 'No tokenizer configs yet.';
     els.tokenizerConfigList.appendChild(empty);
     return;
   }
-  configs.forEach((item) => {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'config-row';
+  items.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'artifact-card selectable-card config-card';
     row.dataset.path = item.path;
-    row.classList.toggle('active', item.path === selectedPath);
-    row.innerHTML = `
-      <div class="config-row-main">
-        <span class="config-title">${item.name || item.path}</span>
-        <span class="config-meta">v${item.version ?? '-'} • vocab ${item.vocab_size ?? '-'}</span>
-      </div>
-      <div class="config-row-sub">${formatDate(item.created_at)}</div>
-    `;
+    row.classList.toggle('selected', item.path === selectedPath);
+    const title = document.createElement('div');
+    title.className = 'artifact-title';
+    title.textContent = item.name || item.path;
+    const summary = document.createElement('div');
+    summary.className = 'config-summary';
+    summary.textContent = `v${item.version ?? '-'} • vocab ${item.vocab_size ?? '-'}`;
+    const date = document.createElement('div');
+    date.className = 'meta';
+    date.textContent = formatDate(item.created_at);
     row.addEventListener('click', () => loadConfig(item.path));
+    row.appendChild(title);
+    row.appendChild(summary);
+    row.appendChild(date);
     els.tokenizerConfigList.appendChild(row);
   });
 }
@@ -95,6 +198,15 @@ async function loadConfig(path) {
   selectedPath = path;
   els.tokenizerConfigEditor.value = data.raw;
   els.tokenizerConfigMeta.textContent = `loaded ${path}`;
+  let parsed = data.config;
+  if (!parsed) {
+    try {
+      parsed = JSON.parse(data.raw);
+    } catch (err) {
+      parsed = null;
+    }
+  }
+  renderSummary(parsed);
   renderList();
 }
 
@@ -120,8 +232,10 @@ function newConfigTemplate() {
 
 function startNew() {
   selectedPath = null;
-  els.tokenizerConfigEditor.value = JSON.stringify(newConfigTemplate(), null, 2);
+  const template = newConfigTemplate();
+  els.tokenizerConfigEditor.value = JSON.stringify(template, null, 2);
   els.tokenizerConfigMeta.textContent = 'new tokenizer config';
+  renderSummary(template);
   renderList();
 }
 
@@ -146,6 +260,7 @@ async function saveNewVersion() {
   selectedPath = path;
   els.tokenizerConfigEditor.value = raw;
   els.tokenizerConfigMeta.textContent = `saved ${path}`;
+  renderSummary(updated);
   await loadList();
   renderList();
 }
@@ -167,6 +282,7 @@ async function duplicateSelected() {
   els.tokenizerConfigEditor.value = JSON.stringify(parsed.parsed, null, 2);
   selectedPath = null;
   els.tokenizerConfigMeta.textContent = 'duplicated; save as new version';
+  renderSummary(parsed.parsed);
   renderList();
 }
 
@@ -181,6 +297,7 @@ async function deleteSelected() {
   selectedPath = null;
   els.tokenizerConfigEditor.value = '';
   els.tokenizerConfigMeta.textContent = 'deleted';
+  renderSummary(null);
   await loadList();
 }
 
@@ -189,6 +306,26 @@ export function initTokenizerConfigs() {
   els.tokenizerConfigSaveBtn.addEventListener('click', saveNewVersion);
   els.tokenizerConfigDuplicateBtn.addEventListener('click', duplicateSelected);
   els.tokenizerConfigDeleteBtn.addEventListener('click', deleteSelected);
+  if (els.tokenizerConfigSearch) {
+    els.tokenizerConfigSearch.addEventListener('input', renderList);
+  }
+  if (els.tokenizerConfigSort) {
+    els.tokenizerConfigSort.addEventListener('change', renderList);
+  }
+  if (els.tokenizerConfigTabSelect) {
+    els.tokenizerConfigTabSelect.addEventListener('change', (event) => {
+      setConfigTab(event.target.value);
+    });
+  }
+  els.tokenizerConfigEditor.addEventListener('input', () => {
+    if (editorTimer) window.clearTimeout(editorTimer);
+    editorTimer = window.setTimeout(() => {
+      const parsed = parseEditor();
+      if (parsed.ok) {
+        renderSummary(parsed.parsed);
+      }
+    }, 200);
+  });
   loadList().then(() => {
     if (configs.length) {
       loadConfig(configs[0].path);
@@ -196,4 +333,5 @@ export function initTokenizerConfigs() {
       startNew();
     }
   });
+  setConfigTab('editor');
 }
