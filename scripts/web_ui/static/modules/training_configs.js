@@ -198,9 +198,19 @@ function renderList() {
     date.className = 'meta';
     date.textContent = formatDate(item.created_at);
     row.addEventListener('click', () => loadConfig(item.path));
+    const actions = document.createElement('div');
+    actions.className = 'artifact-actions';
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteConfig(item.path);
+    });
+    actions.appendChild(deleteBtn);
     row.appendChild(title);
     row.appendChild(summary);
     row.appendChild(date);
+    row.appendChild(actions);
     els.trainingConfigList.appendChild(row);
   });
 }
@@ -326,18 +336,17 @@ async function duplicateSelected() {
   renderList();
 }
 
-async function deleteSelected() {
-  if (!selectedPath) {
-    els.trainingConfigMeta.textContent = 'select a config first';
-    return;
-  }
-  const ok = window.confirm(`Delete ${selectedPath}? This cannot be undone.`);
+async function deleteConfig(path) {
+  if (!path) return;
+  const ok = window.confirm(`Delete ${path}? This cannot be undone.`);
   if (!ok) return;
-  await api('/api/configs/delete', { name: selectedPath });
-  selectedPath = null;
-  els.trainingConfigEditor.value = '';
-  els.trainingConfigMeta.textContent = 'deleted';
-  renderSummary(null);
+  await api('/api/configs/delete', { name: path });
+  if (selectedPath === path) {
+    selectedPath = null;
+    els.trainingConfigEditor.value = '';
+    els.trainingConfigMeta.textContent = 'deleted';
+    renderSummary(null);
+  }
   await loadList();
 }
 
@@ -345,7 +354,6 @@ export function initTrainingConfigs() {
   els.trainingConfigNewBtn.addEventListener('click', startNew);
   els.trainingConfigSaveBtn.addEventListener('click', saveNewVersion);
   els.trainingConfigDuplicateBtn.addEventListener('click', duplicateSelected);
-  els.trainingConfigDeleteBtn.addEventListener('click', deleteSelected);
   if (els.trainingConfigSearch) {
     els.trainingConfigSearch.addEventListener('input', renderList);
   }
