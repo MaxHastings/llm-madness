@@ -316,8 +316,12 @@
         <div class="controls">
           <label>Top-k <input id="inspectTopK" type="number" value="8" min="1" max="50" /></label>
           <button id="inspectBtn" class="primary">Inspect</button>
+          <label>Greedy steps <input id="inspectRolloutCount" type="number" value="32" min="1" max="256" /></label>
+          <button id="inspectRolloutBtn">Roll out</button>
         </div>
         <div id="inspectMeta" class="meta"></div>
+        <div id="inspectRolloutMeta" class="meta"></div>
+        <div id="inspectRollout" class="token-list"></div>
         <div class="inspect-grid">
           <div>
             <h3>Tokens</h3>

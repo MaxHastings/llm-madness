@@ -35,6 +35,38 @@ function renderLayerTopk(layers) {
   });
 }
 
+function appendRolloutToken(token, index) {
+  const el = document.createElement('span');
+  el.className = 'token';
+  el.textContent = `${index}:${token}`;
+  el.title = `step ${index}`;
+  els.inspectRollout.appendChild(el);
+}
+
+async function runGreedyRollout() {
+  if (!state.ids.length) return;
+  const rawCount = parseInt(els.inspectRolloutCount.value || '32', 10);
+  if (!Number.isFinite(rawCount) || rawCount < 1) return;
+  const count = Math.min(rawCount, 256);
+  els.inspectRollout.innerHTML = '';
+  els.inspectRolloutMeta.textContent = 'generating...';
+  els.inspectRolloutBtn.disabled = true;
+  let generated = 0;
+  try {
+    for (let i = 0; i < count; i += 1) {
+      const data = await api('/api/next', { ids: state.ids, top_k: 1 });
+      if (!data.topk || !data.topk.length) break;
+      const choice = data.topk[0];
+      await appendToken(choice.id);
+      appendRolloutToken(choice.token, i);
+      generated += 1;
+    }
+  } finally {
+    els.inspectRolloutBtn.disabled = false;
+    els.inspectRolloutMeta.textContent = `greedy rollout: ${generated} tokens`;
+  }
+}
+
 export function initInspect() {
   els.inspectBtn.addEventListener('click', async () => {
     if (!state.ids.length) return;
@@ -44,4 +76,6 @@ export function initInspect() {
     renderInspectTokens(data.tokens || []);
     renderLayerTopk(data.layers || []);
   });
+
+  els.inspectRolloutBtn.addEventListener('click', runGreedyRollout);
 }
