@@ -1044,6 +1044,60 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 self._send_json({"topk": results, "checkpoint": STATE.current_checkpoint})
                 return
+            if self.path == "/api/sample":
+                payload = self._read_json()
+                ids = payload.get("ids", [])
+                temperature = float(payload.get("temperature", 1.0))
+                top_p = float(payload.get("top_p", 1.0))
+                top_k = int(payload.get("top_k", 0))
+                if temperature < 0:
+                    temperature = 0.0
+                top_p = max(0.0, min(top_p, 1.0))
+                if top_k < 0:
+                    top_k = 0
+                if not ids:
+                    self._send_json({"error": "no ids provided"}, status=400)
+                    return
+                idx = torch.tensor([ids], dtype=torch.long, device=STATE.device)
+                idx = idx[:, -STATE.model.config.block_size :]
+                with torch.no_grad():
+                    logits, _ = STATE.model(idx)
+                    logits = logits[:, -1, :]
+                if temperature <= 0:
+                    token_id = int(torch.argmax(logits, dim=-1).item())
+                    token = STATE.tokenizer.id_to_token(token_id)
+                    self._send_json(
+                        {"id": token_id, "token": token, "temperature": temperature, "top_p": top_p, "top_k": top_k}
+                    )
+                    return
+                logits = logits / max(temperature, 1e-6)
+                probs = torch.softmax(logits, dim=-1)
+                if top_k:
+                    top_k = min(top_k, probs.size(-1))
+                    values, indices = torch.topk(probs, k=top_k)
+                    masked = torch.zeros_like(probs)
+                    masked.scatter_(1, indices, values)
+                    probs = masked / masked.sum()
+                if top_p < 1:
+                    sorted_probs, sorted_idx = torch.sort(probs, descending=True)
+                    cumulative = torch.cumsum(sorted_probs, dim=-1)
+                    mask = cumulative <= top_p
+                    if not mask.any():
+                        mask[0, 0] = True
+                    filtered_probs = sorted_probs * mask
+                    filtered_probs = filtered_probs / filtered_probs.sum()
+                    choice = torch.multinomial(filtered_probs, num_samples=1)
+                    token_id = int(sorted_idx[0, choice[0]].item())
+                    token = STATE.tokenizer.id_to_token(token_id)
+                    self._send_json(
+                        {"id": token_id, "token": token, "temperature": temperature, "top_p": top_p, "top_k": top_k}
+                    )
+                    return
+                choice = torch.multinomial(probs, num_samples=1)
+                token_id = int(choice.item())
+                token = STATE.tokenizer.id_to_token(token_id)
+                self._send_json({"id": token_id, "token": token, "temperature": temperature, "top_p": top_p, "top_k": top_k})
+                return
             if self.path == "/api/checkpoints":
                 checkpoints = STATE.list_checkpoints()
                 self._send_json(

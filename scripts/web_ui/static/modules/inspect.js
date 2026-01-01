@@ -24,14 +24,6 @@ function renderLayerTopk(layers) {
   });
 }
 
-function appendRolloutToken(token, index) {
-  const el = document.createElement('span');
-  el.className = 'token';
-  el.textContent = `${index}:${token}`;
-  el.title = `step ${index}`;
-  els.inspectRollout.appendChild(el);
-}
-
 function setInspectorTab(tab) {
   const previewRoot = els.inspectorTabSelect?.closest('.inspector-preview');
   const panels = previewRoot ? previewRoot.querySelectorAll('.preview-panel') : [];
@@ -43,27 +35,50 @@ function setInspectorTab(tab) {
   });
 }
 
-async function runGreedyRollout() {
+async function runSampling() {
   if (!state.ids.length) return;
-  const rawCount = parseInt(els.inspectRolloutCount.value || '32', 10);
-  if (!Number.isFinite(rawCount) || rawCount < 1) return;
-  const count = Math.min(rawCount, 256);
-  els.inspectRollout.innerHTML = '';
-  els.inspectRolloutMeta.textContent = 'generating...';
-  els.inspectRolloutBtn.disabled = true;
+  const rawSteps = parseInt(els.inspectSampleSteps.value || '32', 10);
+  if (!Number.isFinite(rawSteps) || rawSteps < 1) return;
+  const steps = Math.min(rawSteps, 256);
+  const temperature = parseFloat(els.inspectTemperature.value || '1.0');
+  const topP = parseFloat(els.inspectTopP.value || '0.9');
+  const topK = parseInt(els.inspectTopKSample.value || '0', 10);
+  const safeTemp = Number.isFinite(temperature) ? Math.max(0, Math.min(temperature, 2)) : 1.0;
+  const safeTopP = Number.isFinite(topP) ? Math.max(0, Math.min(topP, 1)) : 1.0;
+  const safeTopK = Number.isFinite(topK) ? Math.max(0, Math.min(topK, 200)) : 0;
+  els.inspectTemperature.value = safeTemp;
+  els.inspectTopP.value = safeTopP;
+  els.inspectTopKSample.value = safeTopK;
+  if (els.promptRolloutMeta) {
+    els.promptRolloutMeta.textContent = 'generating...';
+  }
+  els.inspectGenerateBtn.disabled = true;
   let generated = 0;
   try {
-    for (let i = 0; i < count; i += 1) {
-      const data = await api('/api/next', { ids: state.ids, top_k: 1 });
-      if (!data.topk || !data.topk.length) break;
-      const choice = data.topk[0];
-      await appendToken(choice.id);
-      appendRolloutToken(choice.token, i);
+    for (let i = 0; i < steps; i += 1) {
+      const data = await api('/api/sample', {
+        ids: state.ids,
+        temperature: safeTemp,
+        top_p: safeTopP,
+        top_k: safeTopK,
+      });
+      if (!data || data.error) {
+        if (els.promptRolloutMeta) {
+          els.promptRolloutMeta.textContent = data?.error || 'generation failed';
+        }
+        break;
+      }
+      if (data.id == null) break;
+      await appendToken(data.id);
       generated += 1;
     }
   } finally {
-    els.inspectRolloutBtn.disabled = false;
-    els.inspectRolloutMeta.textContent = generated ? `greedy rollout: ${generated} tokens` : '';
+    els.inspectGenerateBtn.disabled = false;
+    if (els.promptRolloutMeta) {
+      els.promptRolloutMeta.textContent = generated
+        ? `generated ${generated} tokens @ temp ${safeTemp} top-p ${safeTopP} top-k ${safeTopK || 'off'}`
+        : '';
+    }
   }
 }
 
@@ -91,5 +106,5 @@ export function initInspect() {
     renderLayerTopk(data.layers || []);
   });
 
-  els.inspectRolloutBtn.addEventListener('click', runGreedyRollout);
+  els.inspectGenerateBtn.addEventListener('click', runSampling);
 }
