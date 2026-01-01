@@ -152,11 +152,25 @@ class ServerState:
     def ids_to_tokens(self, ids: list[int]) -> list[str]:
         return [self.tokenizer.id_to_token(idx) for idx in ids]
 
-    def inspect(self, ids: list[int], top_k: int) -> dict:
+    def inspect(self, ids: list[int], top_k: int, index: int | None = None) -> dict:
         if not ids:
             return {"error": "no ids provided"}
         max_len = min(len(ids), self.model.config.block_size, 64)
+        original_len = len(ids)
         ids = ids[-max_len:]
+        offset = original_len - len(ids)
+        if index is None:
+            position = len(ids) - 1
+        else:
+            try:
+                index = int(index)
+            except (TypeError, ValueError):
+                return {"error": "invalid index"}
+            if index < offset:
+                return {"error": "index outside inspected window"}
+            position = index - offset
+            if position < 0 or position >= len(ids):
+                return {"error": "index outside inspected window"}
         idx = torch.tensor([ids], dtype=torch.long, device=self.device)
         self.model.eval()
         tokens = [self.tokenizer.id_to_token(i) for i in ids]
@@ -165,7 +179,7 @@ class ServerState:
         results = []
         for layer_idx, hidden in enumerate(hidden_states):
             layer_hidden = self.model.ln_f(hidden)
-            logits = self.model.head(layer_hidden)[:, -1, :]
+            logits = self.model.head(layer_hidden)[:, position, :]
             probs = torch.softmax(logits, dim=-1)
             values, indices = torch.topk(probs, k=min(top_k, probs.size(-1)))
             topk = []
@@ -179,7 +193,14 @@ class ServerState:
                     }
                 )
             results.append({"layer": layer_idx, "topk": topk})
-        return {"layers": results, "tokens": tokens, "meta": f"layers {len(results)}"}
+        meta_token = tokens[position] if tokens else "-"
+        return {
+            "layers": results,
+            "tokens": tokens,
+            "meta": f"layers {len(results)} • token {meta_token} @ {position + offset}",
+            "index": position + offset,
+            "token": meta_token,
+        }
 
     def load_checkpoint(self, checkpoint: str | None) -> None:
         if checkpoint is None:

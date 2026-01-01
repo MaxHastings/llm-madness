@@ -136,6 +136,19 @@ main {
   align-items: start;
 }
 
+.inspector-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.4fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.inspector-left,
+.inspector-right {
+  display: grid;
+  gap: 18px;
+}
+
 .runs-stack {
   display: grid;
   gap: 18px;
@@ -538,11 +551,23 @@ button.token-btn:hover {
   font-size: 12px;
 }
 
+.token-scroll {
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
 .token {
   padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: #fdf9f3;
+}
+
+.token.active {
+  border-color: var(--accent-2);
+  background: #e8f3f5;
+  box-shadow: 0 0 0 1px rgba(31, 122, 140, 0.25);
 }
 
 .meta {
@@ -853,6 +878,10 @@ button.token-btn:hover {
   display: none;
 }
 
+.inspector-preview .preview-panel.is-hidden {
+  display: none;
+}
+
 .run-loss {
   display: grid;
   gap: 8px;
@@ -1051,6 +1080,10 @@ button.token-btn:hover {
   .run-preview {
     position: static;
     max-height: none;
+  }
+
+  .inspector-layout {
+    grid-template-columns: 1fr;
   }
 
   .panel-head {

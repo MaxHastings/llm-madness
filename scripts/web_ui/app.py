@@ -1087,7 +1087,8 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self._read_json()
                 ids = payload.get("ids", [])
                 top_k = int(payload.get("top_k", 10))
-                result = STATE.inspect(ids, top_k)
+                index = payload.get("index")
+                result = STATE.inspect(ids, top_k, index=index)
                 self._send_json(result)
                 return
             self._send_json({"error": "unknown endpoint"}, status=404)

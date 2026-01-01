@@ -370,78 +370,85 @@
     </section>
 
     <section class="page-section" data-section="inspector">
-      <div class="panel">
-        <h2>Model Session</h2>
-        <div class="controls">
-          <span class="meta" id="runMeta">Loading run...</span>
-        </div>
-        <div class="controls">
-          <select id="sessionRunSelect"></select>
-          <button id="loadSessionRun" class="primary">Load Run</button>
-          <span class="meta" id="sessionRunMeta"></span>
-        </div>
-        <div class="controls">
-          <select id="checkpointSelect"></select>
-          <button id="loadCheckpoint" class="primary">Load</button>
-          <span class="meta" id="checkpointMeta"></span>
-        </div>
-      </div>
-
-      <div class="grid">
-        <div class="panel">
-          <h2>Prompt</h2>
-          <div class="controls">
-            <button id="tokenizeBtn" class="primary">Tokenize</button>
-            <button id="decodeBtn">Decode</button>
-            <label>Greedy steps <input id="inspectRolloutCount" type="number" value="32" min="1" max="256" /></label>
-            <button id="inspectRolloutBtn">Roll out</button>
+      <div class="inspector-layout">
+        <div class="inspector-left">
+          <div class="panel">
+            <h2>Model Session</h2>
+            <div class="controls">
+              <span class="meta" id="runMeta">Loading run...</span>
+            </div>
+            <div class="controls">
+              <select id="sessionRunSelect"></select>
+              <button id="loadSessionRun" class="primary">Load Run</button>
+              <span class="meta" id="sessionRunMeta"></span>
+            </div>
+            <div class="controls">
+              <select id="checkpointSelect"></select>
+              <button id="loadCheckpoint" class="primary">Load</button>
+              <span class="meta" id="checkpointMeta"></span>
+            </div>
           </div>
-          <textarea id="promptInput" placeholder="Type a prompt..." spellcheck="false"></textarea>
-          <div class="meta" id="promptMeta"></div>
+          <div class="panel">
+            <h2>Prompt</h2>
+            <div class="controls">
+              <button id="tokenizeBtn" class="primary">Tokenize</button>
+              <button id="decodeBtn">Decode</button>
+              <label>Greedy steps <input id="inspectRolloutCount" type="number" value="32" min="1" max="256" /></label>
+              <button id="inspectRolloutBtn">Roll out</button>
+            </div>
+            <textarea id="promptInput" placeholder="Type a prompt..." spellcheck="false"></textarea>
+            <div class="meta" id="promptMeta"></div>
+          </div>
         </div>
-        <div class="panel">
-          <h2>Tokens</h2>
-          <div id="tokenList" class="token-list"></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>Next Token (Top-k)</h2>
-        <div class="controls">
-          <label>Top-k <input id="topK" type="number" value="8" min="1" max="50" /></label>
-          <button id="nextBtn" class="primary">Probe</button>
-          <span class="meta">Click a token to append it to the prompt.</span>
-        </div>
-        <div id="nextMeta" class="meta"></div>
-        <table id="nextTable">
-          <thead>
-            <tr><th>Rank</th><th>Token</th><th>ID</th><th>Prob</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div class="panel">
-        <h2>Introspection</h2>
-        <div class="controls">
-          <label>Top-k <input id="inspectTopK" type="number" value="8" min="1" max="50" /></label>
-          <button id="inspectBtn" class="primary">Inspect</button>
-        </div>
-        <div id="inspectMeta" class="meta"></div>
-        <div id="inspectRolloutMeta" class="meta"></div>
-        <div id="inspectRollout" class="token-list"></div>
-        <div class="inspect-grid">
-          <div>
-            <h3>Tokens</h3>
-            <div id="inspectTokens" class="token-list"></div>
-            <div id="layerTopkWrap">
-              <h3>Layer Top-K</h3>
-              <table id="layerTopkTable">
-                <thead>
-                  <tr><th>Layer</th><th>Top-K tokens</th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
+        <div class="inspector-right">
+          <div class="panel inspector-preview">
+            <div class="panel-head">
+              <div>
+              <h2>Inspector</h2>
+              <div class="meta" id="inspectorActiveToken">Active token: -</div>
+            </div>
+            <select id="inspectorTabSelect" class="tab-select">
+              <option value="tokens">Tokens</option>
+              <option value="next">Top-k</option>
+              <option value="layers">Layers</option>
+            </select>
+          </div>
+            <div class="preview-body">
+              <div class="preview-panel" data-preview="tokens">
+                <div id="tokenList" class="token-list token-scroll"></div>
+              </div>
+              <div class="preview-panel is-hidden" data-preview="next">
+                <div class="controls">
+                  <label>Top-k <input id="topK" type="number" value="8" min="1" max="50" /></label>
+                  <button id="nextBtn" class="primary">Probe</button>
+                  <span class="meta">Click a token to append it to the prompt.</span>
+                </div>
+                <div id="nextMeta" class="meta"></div>
+                <table id="nextTable">
+                  <thead>
+                    <tr><th>Rank</th><th>Token</th><th>ID</th><th>Prob</th></tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div class="preview-panel is-hidden" data-preview="layers">
+                <div class="controls">
+                  <label>Top-k <input id="inspectTopK" type="number" value="8" min="1" max="50" /></label>
+                  <button id="inspectBtn" class="primary">Inspect</button>
+                </div>
+                <div id="inspectMeta" class="meta"></div>
+                <div id="inspectRolloutMeta" class="meta"></div>
+                <div id="inspectRollout" class="token-list token-scroll"></div>
+                <div id="layerTopkWrap">
+                  <h3>Layer Top-K</h3>
+                  <table id="layerTopkTable">
+                    <thead>
+                      <tr><th>Layer</th><th>Top-K tokens</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>

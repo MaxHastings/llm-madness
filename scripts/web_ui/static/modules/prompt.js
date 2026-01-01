@@ -2,13 +2,58 @@ import { api } from './api.js';
 import { els } from './dom.js';
 import { state } from './state.js';
 
+function formatActiveTokenLabel(activeToken) {
+  if (!activeToken) return 'Active token: -';
+  const tokenLabel = activeToken.token ?? '-';
+  return `Active token: ${tokenLabel} (id ${activeToken.id})`;
+}
+
+function updateActiveTokenUI() {
+  const label = formatActiveTokenLabel(state.activeToken);
+  if (els.inspectorActiveToken) {
+    els.inspectorActiveToken.textContent = label;
+  }
+  if (els.inspectActiveToken) {
+    els.inspectActiveToken.textContent = '';
+  }
+}
+
+function setActiveToken(index, tokens, ids) {
+  if (!tokens.length || index == null || index < 0 || index >= tokens.length) {
+    state.activeToken = null;
+    updateActiveTokenUI();
+    return;
+  }
+  state.activeToken = { index, token: tokens[index], id: ids[index] };
+  updateActiveTokenUI();
+}
+
+function normalizeActiveToken(tokens, ids) {
+  if (!tokens.length) {
+    state.activeToken = null;
+    updateActiveTokenUI();
+    return;
+  }
+  if (!state.activeToken || state.activeToken.index == null || state.activeToken.index >= tokens.length) {
+    setActiveToken(tokens.length - 1, tokens, ids);
+  }
+}
+
 function renderTokens(tokens, ids) {
+  normalizeActiveToken(tokens, ids);
   els.tokenList.innerHTML = '';
   tokens.forEach((tok, i) => {
     const el = document.createElement('span');
     el.className = 'token';
+    if (state.activeToken && state.activeToken.index === i) {
+      el.classList.add('active');
+    }
     el.textContent = `${i}: ${tok} (${ids[i]})`;
     el.title = `index ${i} id ${ids[i]}`;
+    el.addEventListener('click', () => {
+      setActiveToken(i, tokens, ids);
+      renderTokens(tokens, ids);
+    });
     els.tokenList.appendChild(el);
   });
 }
@@ -68,21 +113,29 @@ async function probeNext() {
 export async function appendToken(tokenId) {
   state.ids.push(tokenId);
   await updateFromIds();
+  if (state.tokens.length) {
+    setActiveToken(state.tokens.length - 1, state.tokens, state.ids);
+    renderTokens(state.tokens, state.ids);
+  }
   await probeNext();
 }
 
 export function resetTokens() {
   state.ids = [];
   state.tokens = [];
+  state.activeToken = null;
+  updateActiveTokenUI();
   renderTokens([], []);
   els.promptMeta.textContent = 'no tokens';
 }
 
 export function initPrompt() {
+  updateActiveTokenUI();
   els.tokenizeBtn.addEventListener('click', async () => {
     const data = await api('/api/tokenize', { text: els.promptInput.value });
     state.ids = data.ids;
     state.tokens = data.tokens;
+    setActiveToken(state.tokens.length - 1, state.tokens, state.ids);
     renderTokens(data.tokens, data.ids);
     els.promptMeta.textContent = `chars: ${els.promptInput.value.length} tokens: ${data.ids.length}`;
   });
