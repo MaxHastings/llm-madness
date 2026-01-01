@@ -53,6 +53,9 @@ function renderTokens(tokens, ids) {
     });
     els.tokenList.appendChild(el);
   });
+  if (state.activeToken && state.activeToken.index === tokens.length - 1) {
+    els.tokenList.scrollTop = els.tokenList.scrollHeight;
+  }
 }
 
 function renderTopK(rows) {
