@@ -23,9 +23,46 @@ function renderSelections() {
 }
 
 function setManifestPreview(payload, label) {
-  const raw = payload?.raw || JSON.stringify(payload?.manifest ?? {}, null, 2);
+  const manifest = payload?.manifest ?? null;
+  const raw = payload?.raw || (manifest ? JSON.stringify(manifest, null, 2) : '');
   els.datasetManifestPreview.value = raw || '';
   els.datasetManifestMeta.textContent = label || '';
+  renderManifestFiles(manifest?.files);
+}
+
+function renderManifestFiles(files) {
+  els.datasetManifestFiles.innerHTML = '';
+  if (!files || !files.length) {
+    const empty = document.createElement('div');
+    empty.className = 'meta';
+    empty.textContent = 'No files to show.';
+    els.datasetManifestFiles.appendChild(empty);
+    return;
+  }
+  files.forEach((file) => {
+    const row = document.createElement('div');
+    row.className = 'manifest-file';
+    const name = document.createElement('span');
+    name.textContent = file.path || '-';
+    const size = document.createElement('span');
+    size.className = 'file-size';
+    size.textContent = formatBytes(file.size_bytes);
+    row.appendChild(name);
+    row.appendChild(size);
+    els.datasetManifestFiles.appendChild(row);
+  });
+}
+
+function setPreviewTab(tab) {
+  const tabs = els.datasetPreviewTabs?.querySelectorAll('.tab') || [];
+  const previewRoot = els.datasetPreviewTabs?.closest('.dataset-preview');
+  const panels = previewRoot ? previewRoot.querySelectorAll('.preview-panel') : [];
+  tabs.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  panels.forEach((panel) => {
+    panel.classList.toggle('is-hidden', panel.dataset.preview !== tab);
+  });
 }
 
 async function viewManifest(path) {
@@ -180,7 +217,15 @@ export function initDatasets() {
   els.datasetCreateBtn.addEventListener('click', createManifest);
   els.datasetRefreshBtn.addEventListener('click', () => loadPath(currentPath));
   els.datasetRefreshManifestsBtn.addEventListener('click', refreshDatasetManifests);
+  if (els.datasetPreviewTabs) {
+    els.datasetPreviewTabs.addEventListener('click', (event) => {
+      const btn = event.target.closest('.tab');
+      if (!btn) return;
+      setPreviewTab(btn.dataset.tab);
+    });
+  }
   renderSelections();
   loadPath(currentPath);
   refreshDatasetManifests();
+  setPreviewTab('manifest');
 }

@@ -94,6 +94,84 @@ main {
   gap: 18px;
 }
 
+.datasets-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.25fr) minmax(320px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.dataset-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.dataset-preview {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.preview-tabs {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.preview-tabs .tab {
+  border-radius: 999px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: #f3ede3;
+  font-size: 11px;
+}
+
+.preview-tabs .tab.active {
+  background: var(--accent-2);
+  color: #fff;
+  border-color: var(--accent-2);
+}
+
+.preview-body {
+  display: grid;
+  overflow: hidden;
+}
+
+.preview-panel {
+  height: 100%;
+}
+
+.dataset-preview textarea {
+  min-height: 360px;
+  height: 100%;
+}
+
+.manifest-files {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fcfaf6;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  max-height: 100%;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.manifest-file {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.manifest-file .file-size {
+  color: var(--muted);
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -729,6 +807,15 @@ button.token-btn:hover {
 
   .split {
     grid-template-columns: 1fr;
+  }
+
+  .datasets-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .dataset-preview {
+    position: static;
+    max-height: none;
   }
 
   .panel-head {

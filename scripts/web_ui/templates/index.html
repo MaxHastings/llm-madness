@@ -226,37 +226,58 @@
     </section>
 
     <section class="page-section" data-section="datasets">
-      <div class="grid">
-        <div class="panel">
-          <h2>Dataset Browser (data/)</h2>
-          <div class="controls">
-            <span id="datasetPath" class="meta">data/</span>
-            <button id="datasetRefresh" class="primary">Refresh</button>
+      <div class="datasets-layout">
+        <div class="dataset-stack">
+          <div class="panel">
+            <h2>Dataset Browser (data/)</h2>
+            <div class="controls">
+              <span id="datasetPath" class="meta">data/</span>
+              <button id="datasetRefresh" class="primary">Refresh</button>
+            </div>
+            <div id="datasetEntries" class="file-list"></div>
+            <h3>Selections</h3>
+            <div class="meta" id="datasetMeta"></div>
+            <textarea id="datasetSelections" readonly spellcheck="false"></textarea>
           </div>
-          <div id="datasetEntries" class="file-list"></div>
-          <h3>Selections</h3>
-          <div class="meta" id="datasetMeta"></div>
-          <textarea id="datasetSelections" readonly spellcheck="false"></textarea>
+          <div class="panel">
+            <h2>Create Dataset Manifest</h2>
+            <div class="controls">
+              <input id="datasetName" placeholder="Optional name (e.g. wiki-small)" />
+              <label class="meta">
+                <input id="datasetEnableHashes" type="checkbox" />
+                Enable content hashes
+              </label>
+              <button id="datasetCreate" class="primary">Create</button>
+            </div>
+            <div class="meta" id="datasetCreateMeta"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Existing Manifests</h2>
+              <button id="datasetRefreshManifests" class="primary">Refresh</button>
+            </div>
+            <div id="datasetManifestList"></div>
+          </div>
         </div>
-        <div class="panel">
-          <h2>Create Dataset Manifest</h2>
-          <div class="controls">
-            <input id="datasetName" placeholder="Optional name (e.g. wiki-small)" />
-            <label class="meta">
-              <input id="datasetEnableHashes" type="checkbox" />
-              Enable content hashes
-            </label>
-            <button id="datasetCreate" class="primary">Create</button>
+        <div class="panel dataset-preview">
+          <div class="panel-head">
+            <div>
+              <h2>Manifest Preview</h2>
+              <div class="meta" id="datasetManifestMeta"></div>
+            </div>
+            <div class="preview-tabs" id="datasetPreviewTabs">
+              <button class="tab active" data-tab="manifest">Manifest</button>
+              <button class="tab" data-tab="files">Files</button>
+            </div>
           </div>
-          <div class="meta" id="datasetCreateMeta"></div>
-          <h3>Existing Manifests</h3>
-          <div class="controls">
-            <button id="datasetRefreshManifests" class="primary">Refresh</button>
+          <div class="preview-body">
+            <div class="preview-panel" data-preview="manifest">
+              <textarea id="datasetManifestPreview" readonly spellcheck="false"></textarea>
+            </div>
+            <div class="preview-panel is-hidden" data-preview="files">
+              <div id="datasetManifestFiles" class="manifest-files"></div>
+            </div>
           </div>
-          <div id="datasetManifestList"></div>
-          <h3>Manifest Preview</h3>
-          <div class="meta" id="datasetManifestMeta"></div>
-          <textarea id="datasetManifestPreview" readonly spellcheck="false"></textarea>
         </div>
       </div>
     </section>

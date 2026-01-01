@@ -62,8 +62,10 @@ export const els = {
   datasetCreateMeta: byId('datasetCreateMeta'),
   datasetManifestList: byId('datasetManifestList'),
   datasetRefreshManifestsBtn: byId('datasetRefreshManifests'),
+  datasetPreviewTabs: byId('datasetPreviewTabs'),
   datasetManifestPreview: byId('datasetManifestPreview'),
   datasetManifestMeta: byId('datasetManifestMeta'),
+  datasetManifestFiles: byId('datasetManifestFiles'),
 
   datasetSelect: byId('datasetSelect'),
   refreshDatasetsBtn: byId('refreshDatasets'),
