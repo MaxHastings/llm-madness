@@ -6,6 +6,7 @@ let runsCache = [];
 let selectedRun = null;
 let selectedRunDetails = null;
 let currentLogTab = 'logs';
+let currentInspectorTab = 'overview';
 const liveLogsEnabled = true;
 let logStream = null;
 let lossStream = null;
@@ -122,23 +123,8 @@ async function updateRunHighlights(manifest, runDir) {
 }
 
 function updateFilterOptions(items) {
-  const currentStage = els.runsFilterStage.value || 'all';
   const currentStatus = els.runsFilterStatus.value || 'all';
-  const stages = Array.from(new Set(items.map((row) => row.stage).filter(Boolean))).sort();
   const statuses = Array.from(new Set(items.map((row) => row.status).filter(Boolean))).sort();
-
-  els.runsFilterStage.innerHTML = '';
-  const stageAll = document.createElement('option');
-  stageAll.value = 'all';
-  stageAll.textContent = 'All stages';
-  els.runsFilterStage.appendChild(stageAll);
-  stages.forEach((stage) => {
-    const opt = document.createElement('option');
-    opt.value = stage;
-    opt.textContent = stage;
-    els.runsFilterStage.appendChild(opt);
-  });
-  els.runsFilterStage.value = stages.includes(currentStage) ? currentStage : 'all';
 
   els.runsFilterStatus.innerHTML = '';
   const statusAll = document.createElement('option');
@@ -152,28 +138,12 @@ function updateFilterOptions(items) {
     els.runsFilterStatus.appendChild(opt);
   });
   els.runsFilterStatus.value = statuses.includes(currentStatus) ? currentStatus : 'all';
-
-  if (!els.runsSort.options.length) {
-    const newest = document.createElement('option');
-    newest.value = 'newest';
-    newest.textContent = 'Newest first';
-    const oldest = document.createElement('option');
-    oldest.value = 'oldest';
-    oldest.textContent = 'Oldest first';
-    els.runsSort.appendChild(newest);
-    els.runsSort.appendChild(oldest);
-    els.runsSort.value = 'newest';
-  }
 }
 
 function applyRunFilters(items) {
-  const stageFilter = els.runsFilterStage.value;
   const statusFilter = els.runsFilterStatus.value;
   const searchTerm = (els.runsSearch.value || '').trim().toLowerCase();
   let filtered = items.slice();
-  if (stageFilter && stageFilter !== 'all') {
-    filtered = filtered.filter((row) => row.stage === stageFilter);
-  }
   if (statusFilter && statusFilter !== 'all') {
     filtered = filtered.filter((row) => row.status === statusFilter);
   }
@@ -192,23 +162,23 @@ function applyRunFilters(items) {
       return haystack.includes(searchTerm);
     });
   }
-  const sortOrder = els.runsSort.value || 'newest';
   filtered.sort((a, b) => {
     const left = a.start_time || '';
     const right = b.start_time || '';
     if (left === right) return 0;
-    return sortOrder === 'newest' ? (left < right ? 1 : -1) : (left > right ? 1 : -1);
+    return left < right ? 1 : -1;
   });
   return filtered;
 }
 
 function renderRunRow(item) {
   const row = document.createElement('div');
-  row.className = 'run-item';
-  if (selectedRun && selectedRun.run_dir === item.run_dir) {
+  row.className = 'artifact-card selectable-card run-item';
+  if (selectedRun && ((selectedRun.run_id && selectedRun.run_id === item.run_id) || selectedRun.run_dir === item.run_dir)) {
     row.classList.add('selected');
   }
   row.dataset.runDir = item.run_dir;
+  row.addEventListener('click', () => showRunDetails(item.run_dir));
 
   const main = document.createElement('div');
   main.className = 'run-main';
@@ -258,15 +228,11 @@ function renderRunRow(item) {
   const actions = document.createElement('div');
   actions.className = 'run-actions';
 
-  const viewBtn = document.createElement('button');
-  viewBtn.textContent = 'Inspect';
-  viewBtn.addEventListener('click', () => showRunDetails(item.run_dir));
-  actions.appendChild(viewBtn);
-
   if (item.is_active) {
     const stopBtn = document.createElement('button');
     stopBtn.textContent = 'Stop';
-    stopBtn.addEventListener('click', async () => {
+    stopBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
       await api(`/api/stop/${encodeURIComponent(item.run_id)}`);
       await refreshRunList();
     });
@@ -275,7 +241,8 @@ function renderRunRow(item) {
 
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = 'Delete';
-  deleteBtn.addEventListener('click', async () => {
+  deleteBtn.addEventListener('click', async (event) => {
+    event.stopPropagation();
     const confirmDelete = window.confirm(`Delete run ${item.run_id}? This cannot be undone.`);
     if (!confirmDelete) return;
     await api('/api/run/delete', { run_dir: item.run_dir });
@@ -305,37 +272,48 @@ function renderRunSection(container, items) {
   });
 }
 
-function renderSummary(summary) {
-  els.runSummary.innerHTML = '';
-  if (!summary) return;
-  const rows = [
-    ['Stage', summary.stage],
-    ['Status', summary.status],
-    ['Run ID', summary.run_id],
-    ['Started', formatTime(summary.start_time)],
-    ['Ended', formatTime(summary.end_time)],
-    ['Duration', summary.duration || '-'],
-    ['Run Dir', summary.run_dir],
-  ];
-  rows.forEach(([label, value]) => {
-    const row = document.createElement('div');
-    const key = document.createElement('span');
-    key.textContent = label;
-    const val = document.createElement('span');
-    val.textContent = value || '-';
-    row.appendChild(key);
-    row.appendChild(val);
-    els.runSummary.appendChild(row);
-  });
-}
-
-function renderManifest(manifest) {
-  els.runManifest.innerHTML = '';
+function renderRunDetails(summary, manifest) {
+  els.runDetails.innerHTML = '';
+  if (!summary && !manifest) {
+    return;
+  }
+  const addSection = (label) => {
+    const section = document.createElement('div');
+    section.className = 'summary-section';
+    section.textContent = label;
+    els.runDetails.appendChild(section);
+  };
+  if (summary) {
+    addSection('Overview');
+    const rows = [
+      ['Stage', summary.stage],
+      ['Status', summary.status],
+      ['Run ID', summary.run_id],
+      ['Started', formatTime(summary.start_time)],
+      ['Ended', formatTime(summary.end_time)],
+      ['Duration', summary.duration || '-'],
+      ['Run Dir', summary.run_dir],
+    ];
+    rows.forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'summary-row';
+      const key = document.createElement('span');
+      key.className = 'summary-key';
+      key.textContent = label;
+      const val = document.createElement('span');
+      val.className = 'summary-value';
+      val.textContent = value || '-';
+      row.appendChild(key);
+      row.appendChild(val);
+      els.runDetails.appendChild(row);
+    });
+  }
   if (!manifest) {
+    addSection('Manifest');
     const empty = document.createElement('div');
     empty.className = 'meta';
     empty.textContent = 'No manifest found for this run.';
-    els.runManifest.appendChild(empty);
+    els.runDetails.appendChild(empty);
     return;
   }
   const fields = [
@@ -346,24 +324,33 @@ function renderManifest(manifest) {
     ['Outputs', manifest.outputs],
     ['Config', manifest.config],
   ];
+  const hasField = fields.some(([_, value]) => {
+    if (value == null || value === '') return false;
+    if (typeof value === 'object' && !Object.keys(value || {}).length) return false;
+    return true;
+  });
+  addSection('Manifest');
   fields.forEach(([label, value]) => {
     if (value == null || value === '' || (typeof value === 'object' && !Object.keys(value || {}).length)) {
       return;
     }
     const row = document.createElement('div');
+    row.className = 'summary-row';
     const key = document.createElement('span');
+    key.className = 'summary-key';
     key.textContent = label;
     const val = document.createElement('span');
+    val.className = 'summary-value';
     val.textContent = formatManifestValue(value);
     row.appendChild(key);
     row.appendChild(val);
-    els.runManifest.appendChild(row);
+    els.runDetails.appendChild(row);
   });
-  if (!els.runManifest.childElementCount) {
+  if (!hasField) {
     const empty = document.createElement('div');
     empty.className = 'meta';
     empty.textContent = 'No extra manifest fields to show.';
-    els.runManifest.appendChild(empty);
+    els.runDetails.appendChild(empty);
   }
 }
 
@@ -410,29 +397,11 @@ async function refreshRunTokenizerReport() {
   });
 }
 
-function showTokenizerReport(show) {
-  if (!els.runTokenizerReportWrap) return;
-  els.runTokenizerReportWrap.classList.toggle('is-hidden', !show);
-  if (show) {
-    els.runLogs.classList.add('is-hidden');
-  } else {
-    els.runLogs.classList.remove('is-hidden');
-  }
-}
-
 function setLogTab(tab) {
   currentLogTab = tab;
-  document.querySelectorAll('.run-tabs .tab').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.tab === tab);
-  });
-  if (tab === 'tokenizer') {
-    showTokenizerReport(true);
-    stopLogStream();
-    stopLossStream();
-    refreshRunTokenizerReport();
-    return;
+  if (els.runLogsSelect) {
+    els.runLogsSelect.value = tab;
   }
-  showTokenizerReport(false);
   if (!selectedRunDetails) {
     els.runLogs.textContent = '';
     return;
@@ -441,6 +410,27 @@ function setLogTab(tab) {
   els.runLogs.textContent = (lines || []).join('\n') || 'No logs available.';
   startLogStream(tab);
   ensureLossStream();
+}
+
+function setInspectorTab(tab) {
+  const previewRoot = els.runInspectorTabSelect?.closest('.run-preview');
+  const panels = previewRoot ? previewRoot.querySelectorAll('.preview-panel') : [];
+  currentInspectorTab = tab;
+  if (els.runInspectorTabSelect) {
+    els.runInspectorTabSelect.value = tab;
+  }
+  panels.forEach((panel) => {
+    panel.classList.toggle('is-hidden', panel.dataset.preview !== tab);
+  });
+  if (tab === 'overview') {
+    setLogTab(currentLogTab);
+    return;
+  }
+  stopLogStream();
+  stopLossStream();
+  if (tab === 'tokenizer') {
+    refreshRunTokenizerReport();
+  }
 }
 
 function parseLossLine(line) {
@@ -498,8 +488,7 @@ async function showRunDetails(runDir) {
   };
   els.runDetailMeta.textContent = selectedRun ? `${selectedRun.stage} | ${selectedRun.run_id}` : 'Run detail';
   els.runLoadStatus.textContent = 'Viewing run details.';
-  renderSummary(data.summary);
-  renderManifest(data.manifest);
+  renderRunDetails(data.summary, data.manifest);
   updateRunHighlights(data.manifest, data.summary?.run_dir);
   if (selectedRun && selectedRun.stage === 'train') {
     seedRunLossLogs(data.logs || []);
@@ -507,10 +496,7 @@ async function showRunDetails(runDir) {
     runLossLogs = [];
     renderRunLossChart();
   }
-  setLogTab(currentLogTab);
-  if (currentLogTab === 'tokenizer') {
-    refreshRunTokenizerReport();
-  }
+  setInspectorTab(currentInspectorTab);
   renderRunsFromCache();
 }
 
@@ -622,8 +608,7 @@ async function refreshSelectedRunDetails() {
     logs: data.logs || [],
     process_log: data.process_log || [],
   };
-  renderSummary(data.summary);
-  renderManifest(data.manifest);
+  renderRunDetails(data.summary, data.manifest);
   updateRunHighlights(data.manifest, data.summary?.run_dir || selectedRun?.run_dir);
   if (selectedRun.stage === 'train') {
     seedRunLossLogs(data.logs || []);
@@ -631,7 +616,7 @@ async function refreshSelectedRunDetails() {
     runLossLogs = [];
     renderRunLossChart();
   }
-  setLogTab(currentLogTab);
+  setInspectorTab(currentInspectorTab);
   const now = new Date();
   const stamp = now.toTimeString().slice(0, 8);
   els.runLoadStatus.textContent = `Live logs refreshed at ${stamp}`;
@@ -642,13 +627,9 @@ function clearRunDetail() {
   selectedRunDetails = null;
   els.runDetailMeta.textContent = 'Select a run to inspect.';
   els.runLoadStatus.textContent = '';
-  els.runSummary.innerHTML = '';
-  els.runManifest.innerHTML = '';
+  els.runDetails.innerHTML = '';
   els.runLogs.textContent = '';
   clearTokenizerReport();
-  if (currentLogTab === 'tokenizer') {
-    refreshRunTokenizerReport();
-  }
   if (els.runDatasetName) els.runDatasetName.textContent = '-';
   if (els.runTokenizerName) els.runTokenizerName.textContent = '-';
   if (els.runTrainingConfigName) els.runTrainingConfigName.textContent = '-';
@@ -681,14 +662,20 @@ export async function refreshRunList() {
 export function initRuns() {
   els.refreshRunsBtn.addEventListener('click', refreshRunList);
   els.runsSearch.addEventListener('input', renderRunsFromCache);
-  els.runsFilterStage.addEventListener('change', renderRunsFromCache);
   els.runsFilterStatus.addEventListener('change', renderRunsFromCache);
-  els.runsSort.addEventListener('change', renderRunsFromCache);
-  document.querySelectorAll('.run-tabs .tab').forEach((btn) => {
-    btn.addEventListener('click', () => setLogTab(btn.dataset.tab));
-  });
+  if (els.runInspectorTabSelect) {
+    els.runInspectorTabSelect.addEventListener('change', (event) => {
+      setInspectorTab(event.target.value);
+    });
+  }
+  if (els.runLogsSelect) {
+    els.runLogsSelect.addEventListener('change', (event) => {
+      setLogTab(event.target.value);
+    });
+  }
   if (els.runTokenizerReportRefreshBtn) {
     els.runTokenizerReportRefreshBtn.addEventListener('click', refreshRunTokenizerReport);
   }
   refreshRunList();
+  setInspectorTab('overview');
 }

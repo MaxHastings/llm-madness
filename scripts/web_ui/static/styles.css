@@ -129,7 +129,29 @@ main {
   align-items: start;
 }
 
+.runs-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.4fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.runs-stack {
+  display: grid;
+  gap: 18px;
+}
+
 .config-editor-panel {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+}
+
+.run-preview {
   position: sticky;
   top: 20px;
   align-self: start;
@@ -269,6 +291,14 @@ main {
 
 .summary-value {
   color: var(--ink);
+}
+
+.summary-section {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
 }
 .vocab-summary {
   font-size: 11px;
@@ -586,7 +616,7 @@ button.token-btn:hover {
 .runs-list {
   display: grid;
   gap: 8px;
-  max-height: 260px;
+  max-height: 420px;
   overflow: auto;
   padding-right: 4px;
 }
@@ -813,6 +843,21 @@ button.token-btn:hover {
   font-size: 12px;
 }
 
+.run-preview .preview-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.run-preview .preview-panel.is-hidden {
+  display: none;
+}
+
+.run-loss {
+  display: grid;
+  gap: 8px;
+}
+
 .run-highlights div {
   display: grid;
   grid-template-columns: 120px 1fr;
@@ -995,6 +1040,15 @@ button.token-btn:hover {
   }
 
   .config-editor-panel {
+    position: static;
+    max-height: none;
+  }
+
+  .runs-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .run-preview {
     position: static;
     max-height: none;
   }

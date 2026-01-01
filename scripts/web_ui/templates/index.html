@@ -203,104 +203,112 @@
     </section>
 
     <section class="page-section" data-section="runs">
-      <div class="panel">
-        <h2>Create Run</h2>
-        <div class="controls">
-          <select id="datasetSelect"></select>
-          <button id="refreshDatasets" class="primary">Refresh Datasets</button>
-        </div>
-        <div class="controls">
-          <select id="runTokenizerVocabSelect"></select>
-          <button id="refreshTokenizerVocabs">Refresh Tokenizer Vocabs</button>
-        </div>
-        <div class="controls">
-          <select id="trainingConfigSelect"></select>
-          <button id="refreshTrainingConfigs">Refresh Training Configs</button>
-        </div>
-        <div class="controls">
-          <button class="primary" id="runCreate">Create Run</button>
-          <span class="meta" id="runSetupMeta"></span>
-        </div>
-      </div>
-      <div class="panel runs-workspace">
-        <aside class="runs-sidebar">
-          <div class="panel-head">
-            <div>
-              <h2>Runs Workspace</h2>
-              <p class="meta" id="runsMeta"></p>
+      <div class="runs-layout">
+        <div class="runs-stack">
+          <div class="panel">
+            <h2>Create Run</h2>
+            <div class="controls">
+              <select id="datasetSelect"></select>
+              <button id="refreshDatasets" class="primary">Refresh Datasets</button>
             </div>
             <div class="controls">
-            <button id="refreshRuns" class="primary">Refresh</button>
-            <input id="runsSearch" placeholder="Search runs" />
-            <select id="runsFilterStage"></select>
-            <select id="runsFilterStatus"></select>
-            <select id="runsSort"></select>
+              <select id="runTokenizerVocabSelect"></select>
+              <button id="refreshTokenizerVocabs">Refresh Tokenizer Vocabs</button>
+            </div>
+            <div class="controls">
+              <select id="trainingConfigSelect"></select>
+              <button id="refreshTrainingConfigs">Refresh Training Configs</button>
+            </div>
+            <div class="controls">
+              <button class="primary" id="runCreate">Create Run</button>
+              <span class="meta" id="runSetupMeta"></span>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Runs</h2>
+                <p class="meta" id="runsMeta"></p>
+              </div>
+              <button id="refreshRuns" class="primary">Refresh</button>
+            </div>
+            <div class="controls">
+              <input id="runsSearch" placeholder="Search runs" />
+              <select id="runsFilterStatus"></select>
+            </div>
+            <div class="runs-columns">
+              <details class="runs-section" open>
+                <summary>Active</summary>
+                <div id="runsActiveList" class="runs-list"></div>
+              </details>
+              <details class="runs-section">
+                <summary>History</summary>
+                <div id="runsHistoryList" class="runs-list"></div>
+              </details>
+            </div>
           </div>
         </div>
-          <div class="runs-columns">
-            <details class="runs-section" open>
-              <summary>Active</summary>
-              <div id="runsActiveList" class="runs-list"></div>
-            </details>
-            <details class="runs-section">
-              <summary>History</summary>
-              <div id="runsHistoryList" class="runs-list"></div>
-            </details>
+        <div class="panel run-preview">
+          <div class="panel-head">
+            <div>
+              <h2>Run Inspector</h2>
+              <div class="meta" id="runDetailMeta">Select a run to inspect.</div>
+            </div>
+            <select id="runInspectorTabSelect" class="tab-select">
+              <option value="overview">Overview</option>
+              <option value="details">Details</option>
+              <option value="tokenizer">Tokenizer</option>
+            </select>
           </div>
-        </aside>
-        <section class="runs-inspector">
-          <div class="run-drawer" id="runDrawer">
-            <div class="drawer-head">
-              <div>
-                <h3>Inspector Target</h3>
-                <div class="meta" id="runDetailMeta">Select a run to inspect.</div>
+          <div class="meta" id="runLoadStatus"></div>
+          <div class="preview-body">
+            <div class="preview-panel" data-preview="overview">
+              <div class="run-highlights">
+                <div>
+                  <span>Dataset</span>
+                  <strong id="runDatasetName">-</strong>
+                </div>
+                <div>
+                  <span>Tokenizer vocab</span>
+                  <strong id="runTokenizerName">-</strong>
+                </div>
+                <div>
+                  <span>Training config</span>
+                  <strong id="runTrainingConfigName">-</strong>
+                </div>
               </div>
-            </div>
-            <div class="meta" id="runLoadStatus"></div>
-            <div class="run-highlights">
-              <div>
-                <span>Dataset</span>
-                <strong id="runDatasetName">-</strong>
+              <div class="run-loss">
+                <div class="meta">Loss (train/val)</div>
+                <div id="runLossChart" class="chart run-loss-chart"></div>
+                <div class="meta" id="runLossMeta"></div>
               </div>
-              <div>
-                <span>Tokenizer vocab</span>
-                <strong id="runTokenizerName">-</strong>
-              </div>
-              <div>
-                <span>Training config</span>
-                <strong id="runTrainingConfigName">-</strong>
-              </div>
-            </div>
-            <details class="run-details">
-              <summary>Details</summary>
-              <div class="run-summary" id="runSummary"></div>
-              <div class="run-manifest" id="runManifest"></div>
-            </details>
-            <div class="run-loss">
-              <div class="meta">Loss (train/val)</div>
-              <div id="runLossChart" class="chart run-loss-chart"></div>
-              <div class="meta" id="runLossMeta"></div>
-            </div>
-            <div class="run-tabs">
-              <button class="tab active" data-tab="logs">logs.jsonl</button>
-              <button class="tab" data-tab="process">process.log</button>
-              <button class="tab" data-tab="tokenizer">Tokenizer Report</button>
-            </div>
-            <div id="runTokenizerReport" class="run-tokenizer-report is-hidden">
               <div class="controls">
-                <button id="runTokenizerReportRefresh" class="primary">Refresh</button>
-                <span class="meta" id="runTokenizerReportMeta"></span>
+                <select id="runLogsSelect" class="tab-select">
+                  <option value="logs">logs.jsonl</option>
+                  <option value="process">process.log</option>
+                </select>
               </div>
-              <table id="runTokenizerReportTable">
-                <thead>
-                  <tr><th>Token</th><th>ID</th><th>Count</th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
+              <pre id="runLogs" class="run-detail"></pre>
             </div>
-            <pre id="runLogs" class="run-detail"></pre>
+            <div class="preview-panel is-hidden" data-preview="details">
+              <div class="summary-grid run-details-card" id="runDetails"></div>
+            </div>
+            <div class="preview-panel is-hidden" data-preview="tokenizer">
+              <div id="runTokenizerReport" class="run-tokenizer-report">
+                <div class="controls">
+                  <button id="runTokenizerReportRefresh" class="primary">Refresh</button>
+                  <span class="meta" id="runTokenizerReportMeta"></span>
+                </div>
+                <table id="runTokenizerReportTable">
+                  <thead>
+                    <tr><th>Token</th><th>ID</th><th>Count</th></tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </section>
+        </div>
       </div>
     </section>
 
