@@ -366,6 +366,16 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
     }
 
 
+def select_resume_checkpoint(run_dir: Path) -> Path | None:
+    latest = run_dir / "latest.pt"
+    if latest.exists():
+        return latest
+    checkpoints = sorted((run_dir / "checkpoints").glob("checkpoint_*.pt"))
+    if checkpoints:
+        return checkpoints[-1]
+    return None
+
+
 def resolve_latest_path(path: Path) -> Path:
     if "latest" not in path.parts:
         return path
@@ -1118,6 +1128,91 @@ class Handler(BaseHTTPRequestHandler):
                 proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
                 RUN_PROCS[run_id] = {"process": proc, "stage": stage, "run_dir": str(run_dir)}
                 self._send_json({"run_id": run_id, "run_dir": str(run_dir), "stage": stage})
+                return
+            if self.path == "/api/run/resume":
+                if is_any_run_active():
+                    self._send_json({"error": "another run is active; stop it first"}, status=400)
+                    return
+                payload = self._read_json()
+                run_dir = payload.get("run_dir")
+                if not run_dir:
+                    self._send_json({"error": "run_dir required"}, status=400)
+                    return
+                run_path = Path(str(run_dir)).resolve()
+                if RUNS_ROOT.resolve() not in run_path.parents:
+                    self._send_json({"error": "invalid run path"}, status=400)
+                    return
+                manifest_path = run_path / "run.json"
+                if not manifest_path.exists():
+                    self._send_json({"error": "run.json missing"}, status=404)
+                    return
+                try:
+                    manifest = json.loads(manifest_path.read_text())
+                except json.JSONDecodeError:
+                    self._send_json({"error": "run.json invalid"}, status=400)
+                    return
+                if infer_stage(run_path, manifest) != "train":
+                    self._send_json({"error": "resume supported for train runs only"}, status=400)
+                    return
+                config_path = run_path / "training_config.json"
+                if not config_path.exists():
+                    self._send_json({"error": "training_config.json missing"}, status=404)
+                    return
+                inputs = manifest.get("inputs", {}) if isinstance(manifest, dict) else {}
+                data_path = inputs.get("data")
+                tokenizer_path = inputs.get("tokenizer") or str(run_path / "tokenizer.json")
+                if not data_path:
+                    self._send_json({"error": "data path missing in run.json"}, status=400)
+                    return
+                data_candidate = Path(str(data_path)).resolve()
+                if not data_candidate.exists():
+                    self._send_json({"error": "data path not found"}, status=404)
+                    return
+                tok_candidate = Path(str(tokenizer_path)).resolve()
+                if not tok_candidate.exists():
+                    self._send_json({"error": "tokenizer path not found"}, status=404)
+                    return
+                ckpt_path = select_resume_checkpoint(run_path)
+                if ckpt_path is None:
+                    self._send_json({"error": "no checkpoints found for run"}, status=404)
+                    return
+                ok, err = checkpoint_supports_resume(ckpt_path)
+                if not ok:
+                    self._send_json({"error": err or "checkpoint cannot resume"}, status=400)
+                    return
+                run_id = timestamp()
+                cmd = [
+                    sys.executable,
+                    "-m",
+                    "scripts.train_model",
+                    "--config",
+                    str(config_path),
+                    "--set",
+                    f"run.id={run_id}",
+                    "--data",
+                    str(data_candidate),
+                    "--tokenizer",
+                    str(tok_candidate),
+                    "--init-checkpoint",
+                    str(ckpt_path),
+                    "--mode",
+                    "resume",
+                ]
+                meta = manifest.get("config", {}).get("meta", {}) if isinstance(manifest, dict) else {}
+                if isinstance(meta, dict) and meta.get("name"):
+                    resume_name = f"{meta['name']} (resume)"
+                    cmd += ["--set", f"meta.name={resume_name}"]
+                run_dir = RUNS_ROOT / "train" / run_id
+                run_dir.mkdir(parents=True, exist_ok=True)
+                log_path = run_dir / "process.log"
+                log_file = log_path.open("a")
+                env = os.environ.copy()
+                env.setdefault("TOKENIZERS_PARALLELISM", "false")
+                env.setdefault("KMP_SHM_DISABLE", "1")
+                env.setdefault("KMP_USE_SHM", "0")
+                proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
+                RUN_PROCS[run_id] = {"process": proc, "stage": "train", "run_dir": str(run_dir)}
+                self._send_json({"run_id": run_id, "run_dir": str(run_dir), "stage": "train"})
                 return
             if self.path == "/api/run/tokenizer_report":
                 payload = self._read_json()

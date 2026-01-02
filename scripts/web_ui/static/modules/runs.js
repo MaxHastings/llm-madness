@@ -244,6 +244,21 @@ function renderRunRow(item) {
     actions.appendChild(stopBtn);
   }
 
+  if (!item.is_active && item.status === 'stopped' && item.has_checkpoints) {
+    const resumeBtn = document.createElement('button');
+    resumeBtn.textContent = 'Resume';
+    resumeBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      try {
+        await api('/api/run/resume', { run_dir: item.run_dir });
+        await refreshRunList();
+      } catch (err) {
+        window.alert(err.message || 'Resume failed.');
+      }
+    });
+    actions.appendChild(resumeBtn);
+  }
+
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = 'Delete';
   deleteBtn.addEventListener('click', async (event) => {
