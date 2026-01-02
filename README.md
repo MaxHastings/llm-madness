@@ -18,29 +18,144 @@ A lightweight, end-to-end text LLM pipeline with a web UI for configs, datasets,
 
 ## Core concepts
 
-- Tokenizer configs live in `configs/tokenizer/` (defaults tracked; custom UI-generated configs ignored).
-- Training configs live in `configs/training/` (defaults tracked; custom UI-generated configs ignored).
-- Dataset manifests live under `runs/datasets/<id>/dataset_manifest.json` with a `snapshot.txt`.
-- Tokenizer runs output to `runs/tokenizer/<timestamp>/`.
-- Training runs output to `runs/train/<timestamp>/`.
+### **1. Custom LLM Training Pipeline**
+- **GPT-style transformer implementation** (`model. py`)
+  - Causal self-attention with multi-head architecture
+  - Configurable model dimensions (layers, heads, embedding size, block size)
+  - Built-in generation with temperature and top-k sampling
+  - Forward passes with attention trace and hidden state inspection
+  
+- **Training infrastructure** (`stages/train.py`)
+  - AdamW optimizer with learning rate warmup and cosine decay
+  - Automatic device selection (CUDA/MPS/CPU)
+  - Gradient clipping and dropout regularization
+  - Checkpoint saving at intervals
+  - Live sampling during training to monitor behavior
 
-## Typical workflow
+### **2. Tokenizer Experimentation**
+- **BPE tokenizer training** (`tokenizer.py`)
+  - Byte-level tokenization with customizable vocabulary sizes
+  - Special token discovery via regex patterns
+  - Configurable pre-tokenization (digit splitting, prefix spaces)
+  - Vocabulary versioning and manifest tracking
 
-1) Add text files under `data/`
-2) Create a dataset snapshot in the Web UI (Datasets)
-3) Generate a tokenizer vocab from the snapshot (Tokenizer Vocabularies)
+### **3. Dataset Management**
+- **Dataset manifests** (`datasets/manifest.py`)
+  - Combine multiple text files into versioned snapshots
+  - SHA-256 hashing for reproducibility
+  - Automatic train/validation splitting
+  - Track dataset lineage and sources
 
-4) Launch a training run (Training Configs / Training Runs)
-5) Inspect outputs and debug behavior (Inspect)
+### **4. Web-Based Inspector UI**
+A **comprehensive Flask-based web interface** for:
+- **Tokenizer Config Management**: Create, version, and compare tokenizer configurations
+- **Training Config Management**: Design model architectures and training hyperparameters
+- **Dataset Browser**: View and organize training datasets
+- **Run Inspection**: 
+  - Real-time loss curve visualization
+  - Sample generation monitoring
+  - Per-layer attention inspection
+  - Token-level top-k prediction analysis
+  - Training log streaming
 
-## Run it
+### **5. Experiment Tracking & Reproducibility**
+- **Manifest system** (`runs/`)
+  - Every run generates a `run.json` with inputs, outputs, config, and git SHA
+  - Automatic artifact organization by stage (tokenizer/train/pipeline)
+  - Complete provenance tracking from data → tokenizer → model
 
-```bash
-pip install -r requirements.txt
-python -m scripts.web_ui
+### **6. Pipeline Orchestration**
+- **End-to-end pipeline** (`stages/pipeline.py`)
+  - Chain tokenizer training → model training
+  - Automatic resolution of "latest" runs
+  - Configurable stage enabling/disabling
+  - Error handling with status tracking
+
+---
+
+## **Practical Use Cases for AI Engineers**
+
+### **Research & Experimentation**
+1. **Architecture search**:  Quickly iterate on model dimensions (layers, heads, embedding sizes)
+2. **Tokenizer optimization**: Test different vocabulary sizes and special token strategies
+3. **Training dynamics**: Study loss curves, convergence patterns, and learning rate schedules
+4. **Ablation studies**: Version configs to compare different hyperparameters
+
+### **Educational & Learning**
+1. **Understand transformer internals**: Clean, readable implementation of GPT architecture
+2. **Debug attention patterns**: Visualize attention maps per layer and head
+3. **Token prediction analysis**: See what the model "thinks" at each position
+
+### **Custom Domain Applications**
+1. **Domain-specific tokenization**: Train BPE on specialized corpora (code, math, medical texts)
+2. **Small model deployment**: Train tiny models for edge devices or specific tasks
+3. **Data exploration**: Use the dataset tools to analyze text statistics
+
+### **Prototyping & Validation**
+1. **Proof-of-concept models**:  Quickly train small models to validate ideas
+2. **Synthetic data experiments**: Test with custom-generated datasets
+3. **Baseline establishment**: Create reference models for comparison
+
+---
+
+## **Key Technical Features**
+
+### **Model Architecture** (`model.py`)
+```python
+- CausalSelfAttention with multi-head attention
+- MLP feed-forward blocks (4x expansion)
+- Layer normalization (pre-norm architecture)
+- Position + token embeddings
+- Temperature + top-k sampling generation
+- Trace mode for debugging (attention maps, MLP outputs, hidden states)
 ```
 
-## Notes
+### **Training Loop** (`stages/train.py`)
+```python
+- Learning rate warmup + cosine annealing
+- Train/validation splitting with per-split loss estimation
+- Automatic perplexity calculation
+- Live sample generation at eval intervals
+- JSONL logging for loss/perplexity/samples
+- Checkpoint management with "latest" symlink
+```
 
-- `data/` and `runs/` are gitignored by default.
-- Use `--set key=value` with CLI scripts to override config fields.
+### **Configuration System**
+- JSON-based configs with dot-path overrides (`--set model.n_layer=8`)
+- Metadata tracking (name, version, parent_id, timestamps)
+- Default config templates in `configs/`
+
+
+
+## **Getting Started as an AI Engineer**
+
+### **Quick Start**
+```bash
+# Install dependencies
+pip install -r requirements. txt  # Only requires 'tokenizers'
+
+# Launch web UI
+python -m scripts. web_ui
+
+# Or use CLI directly
+python scripts/train_tokenizer.py --config configs/tokenizer/default__v002.json
+python scripts/train_model.py --config configs/training/default__v001.json
+python scripts/pipeline.py --config configs/pipeline. json
+```
+
+### **Example Workflow**
+1. Add training data to `data/*.txt`
+2. Create dataset snapshot via Web UI or CLI
+3. Train tokenizer on snapshot
+4. Configure model architecture
+5. Train model with real-time monitoring
+6. Inspect results:  loss curves, samples, attention patterns
+
+---
+
+## **Best For**
+- Rapid prototyping of small LLMs  
+- Educational purposes (understanding transformers)  
+- Domain-specific tokenizer research  
+- Debugging model behavior with transparency  
+- Local experimentation without heavy infrastructure
