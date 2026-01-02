@@ -116,6 +116,20 @@ def is_any_run_active() -> bool:
     return any(info["process"].poll() is None for info in RUN_PROCS.values())
 
 
+def dir_txt_size(path: Path) -> int:
+    total = 0
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [name for name in dirs if not name.startswith(".")]
+        for name in files:
+            if name.startswith(".") or not name.lower().endswith(".txt"):
+                continue
+            try:
+                total += (Path(root) / name).stat().st_size
+            except OSError:
+                continue
+    return total
+
+
 def list_config_paths(scope: str) -> list[Path]:
     scope = (scope or "pipeline").lower()
     if scope == "pipeline":
@@ -365,6 +379,7 @@ class Handler(BaseHTTPRequestHandler):
                             "name": child.name,
                             "type": "dir",
                             "rel_path": str(child.relative_to(DATA_ROOT)),
+                            "size_bytes": dir_txt_size(child),
                         }
                     )
                 elif child.is_file() and child.suffix.lower() == ".txt":

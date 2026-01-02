@@ -3,6 +3,7 @@ import { els } from './dom.js';
 
 let currentPath = '';
 const selections = new Set();
+const selectionSizes = new Map();
 let selectedManifestPath = null;
 
 function formatBytes(bytes) {
@@ -20,7 +21,21 @@ function formatBytes(bytes) {
 function renderSelections() {
   const items = Array.from(selections).sort();
   els.datasetSelections.value = items.join('\n');
-  els.datasetMeta.textContent = items.length ? `${items.length} selection(s)` : 'Select files and folders under data/.';
+  if (!items.length) {
+    els.datasetMeta.textContent = 'Select files and folders under data/.';
+    return;
+  }
+  let total = 0;
+  let unknown = false;
+  selections.forEach((path) => {
+    if (!selectionSizes.has(path)) {
+      unknown = true;
+      return;
+    }
+    total += selectionSizes.get(path);
+  });
+  const sizeLabel = unknown ? 'size unknown' : `${formatBytes(total)} total`;
+  els.datasetMeta.textContent = `${items.length} selection(s) | ${sizeLabel}`;
 }
 
 function setManifestPreview(payload, label) {
@@ -114,8 +129,12 @@ function renderEntries(entries, parent) {
     checkbox.addEventListener('change', () => {
       if (checkbox.checked) {
         selections.add(entry.rel_path);
+        if (entry.size_bytes != null) {
+          selectionSizes.set(entry.rel_path, entry.size_bytes);
+        }
       } else {
         selections.delete(entry.rel_path);
+        selectionSizes.delete(entry.rel_path);
       }
       renderSelections();
     });
@@ -130,16 +149,22 @@ function renderEntries(entries, parent) {
 
     const meta = document.createElement('span');
     meta.className = 'file-meta';
-    if (entry.type === 'file') {
+    if (entry.size_bytes != null) {
       meta.textContent = formatBytes(entry.size_bytes);
-    } else {
+    } else if (entry.type === 'dir') {
       meta.textContent = 'folder';
+    } else {
+      meta.textContent = '-';
     }
 
     row.appendChild(checkbox);
     row.appendChild(label);
     row.appendChild(meta);
     els.datasetEntries.appendChild(row);
+
+    if (checkbox.checked && entry.size_bytes != null && !selectionSizes.has(entry.rel_path)) {
+      selectionSizes.set(entry.rel_path, entry.size_bytes);
+    }
   });
 
   if (!entries.length) {
@@ -227,6 +252,7 @@ async function createManifest() {
   });
   els.datasetCreateMeta.textContent = `created ${res.dataset_id} (files ${res.file_count}, ${formatBytes(res.total_bytes)})`;
   selections.clear();
+  selectionSizes.clear();
   renderSelections();
   await refreshDatasetManifests();
 }
