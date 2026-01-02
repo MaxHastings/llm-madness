@@ -13,6 +13,7 @@
 # training configs (user-specific)
 /configs/training/**
 !/configs/training/default__v001.json
+!/configs/training/modern_tiny__v001.json
 
 # user-owned scripts (keep folder, ignore contents)
 /user_scripts/**

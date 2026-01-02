@@ -23,10 +23,14 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--init-checkpoint", type=Path, default=None)
     parser.add_argument("--mode", type=str, default=None, choices=["fresh", "fork", "resume"])
+    parser.add_argument("--device", type=str, default=None, help="override training.device (auto/cpu/cuda/mps)")
     parser.add_argument("--set", action="append", default=None, help="override config key=value (dot paths ok)")
     args = parser.parse_args()
 
-    config = load_config(args.config, overrides=args.set)
+    overrides = list(args.set or [])
+    if args.device:
+        overrides.append(f"training.device={args.device}")
+    config = load_config(args.config, overrides=overrides)
 
     data_path = args.data
     if args.dataset_manifest is not None:

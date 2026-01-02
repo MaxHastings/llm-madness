@@ -95,7 +95,10 @@ def run_pipeline(config: dict, repo_root: Path) -> dict:
 
         if train_cfg.get("enabled", True):
             training_config_path = train_cfg.get("config", "configs/training/default__v001.json")
-            training_config = load_config(Path(training_config_path))
+            train_overrides = train_cfg.get("config_overrides")
+            if train_overrides is not None and not isinstance(train_overrides, list):
+                raise SystemExit("train.config_overrides must be a list of key=value strings")
+            training_config = load_config(Path(training_config_path), overrides=train_overrides)
             data_path = train_cfg.get("data")
             tokenizer_path_cfg = train_cfg.get("tokenizer")
             if tokenizer_path_cfg is None and tokenizer_path is not None:

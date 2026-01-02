@@ -12,7 +12,12 @@
     "n_layer": 4,
     "n_head": 4,
     "n_embd": 256,
-    "dropout": 0.1
+    "dropout": 0.1,
+    "use_rmsnorm": false,
+    "use_swiglu": false,
+    "use_rope": false,
+    "use_sdpa": false,
+    "use_kv_cache": false
   },
   "training": {
     "device": "auto",

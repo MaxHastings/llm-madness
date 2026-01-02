@@ -13,18 +13,9 @@ from llm_madness.checkpoints import build_checkpoint_payload, is_checkpoint_v2, 
 from llm_madness.data import encode_text, get_batch, get_batch_memmap, load_token_dataset, split_text_by_lines
 from llm_madness.model import GPT, GPTConfig
 from llm_madness.runs import finish_manifest, start_manifest
+from llm_madness.torch_device import select_device
 from llm_madness.tokenizer import load_tokenizer
 from llm_madness.utils import ensure_dir, find_latest_run, sha256_file, timestamp
-
-
-def select_device(name: str) -> torch.device:
-    if name == "auto":
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-            return torch.device("mps")
-        return torch.device("cpu")
-    return torch.device(name)
 
 
 def estimate_loss(
@@ -94,7 +85,10 @@ def run_train(
     random.seed(seed)
     torch.manual_seed(seed)
 
-    device = select_device(str(train_cfg.get("device", "auto")))
+    try:
+        device = select_device(str(train_cfg.get("device", "auto")), strict=True)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
     max_iters = int(train_cfg.get("max_iters", 2000))
     batch_size = int(train_cfg.get("batch_size", 32))
@@ -166,6 +160,12 @@ def run_train(
             n_head=int(model_cfg.get("n_head", 4)),
             n_embd=int(model_cfg.get("n_embd", 256)),
             dropout=float(model_cfg.get("dropout", 0.1)),
+            use_rmsnorm=bool(model_cfg.get("use_rmsnorm", False)),
+            use_swiglu=bool(model_cfg.get("use_swiglu", False)),
+            use_rope=bool(model_cfg.get("use_rope", False)),
+            use_sdpa=bool(model_cfg.get("use_sdpa", False)),
+            use_kv_cache=bool(model_cfg.get("use_kv_cache", False)),
+            rope_theta=float(model_cfg.get("rope_theta", 10000.0)),
         )
         model = GPT(gpt_config).to(device)
         optimizer = torch.optim.AdamW(

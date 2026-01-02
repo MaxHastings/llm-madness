@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 
 from llm_madness.model import GPT, GPTConfig
+from llm_madness.torch_device import select_device as select_torch_device
 from llm_madness.tokenizer import load_tokenizer
 from llm_madness.utils import find_latest_run
 
@@ -68,6 +69,12 @@ class ServerState:
             n_head=int(model_cfg.get("n_head", 4)),
             n_embd=int(model_cfg.get("n_embd", 256)),
             dropout=float(model_cfg.get("dropout", 0.1)),
+            use_rmsnorm=bool(model_cfg.get("use_rmsnorm", False)),
+            use_swiglu=bool(model_cfg.get("use_swiglu", False)),
+            use_rope=bool(model_cfg.get("use_rope", False)),
+            use_sdpa=bool(model_cfg.get("use_sdpa", False)),
+            use_kv_cache=bool(model_cfg.get("use_kv_cache", False)),
+            rope_theta=float(model_cfg.get("rope_theta", 10000.0)),
         )
         return GPT(gpt_config).to(self.device)
 
@@ -226,14 +233,7 @@ class ServerState:
 
 
 def select_device(name: str) -> torch.device:
-    if name == "auto":
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-            return torch.device("mps")
+    try:
+        return select_torch_device(name, strict=True)
+    except ValueError:
         return torch.device("cpu")
-    if name.startswith("cuda") and not torch.cuda.is_available():
-        return torch.device("cpu")
-    if name == "mps" and (not getattr(torch.backends, "mps", None) or not torch.backends.mps.is_available()):
-        return torch.device("cpu")
-    return torch.device(name)

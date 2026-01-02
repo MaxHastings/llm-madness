@@ -129,6 +129,14 @@ A **built-in Python web interface** for:
 - Metadata tracking (name, version, parent_id, timestamps)
 - Default config templates in `configs/`
 
+### **Model Flags (Optional)**
+- `use_rmsnorm`: swap LayerNorm → RMSNorm
+- `use_swiglu`: gated FFN (SwiGLU) instead of GELU MLP
+- `use_rope`: rotary position embeddings (disables absolute `pos_emb`)
+- `use_sdpa`: use PyTorch scaled dot-product attention on CUDA (CPU/MPS fallback to manual path)
+- `use_kv_cache`: cache K/V during generation for faster autoregressive decode
+- Example: `configs/training/modern_tiny__v001.json` enables a modern tiny stack
+
 
 
 ## **Getting Started as an AI Engineer**
