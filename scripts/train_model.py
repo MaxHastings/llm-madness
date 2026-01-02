@@ -21,6 +21,8 @@ def main() -> None:
     parser.add_argument("--dataset-manifest", type=Path, default=None)
     parser.add_argument("--tokenizer", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument("--init-checkpoint", type=Path, default=None)
+    parser.add_argument("--mode", type=str, default=None, choices=["fresh", "fork", "resume"])
     parser.add_argument("--set", action="append", default=None, help="override config key=value (dot paths ok)")
     args = parser.parse_args()
 
@@ -45,7 +47,15 @@ def main() -> None:
 
     output_dir = args.output_dir or Path(config.get("output_dir", "runs/train"))
     repo_root = Path(__file__).resolve().parents[1]
-    result = run_train(config, data_path, tokenizer_path, output_dir, repo_root)
+    result = run_train(
+        config,
+        data_path,
+        tokenizer_path,
+        output_dir,
+        repo_root,
+        init_checkpoint=args.init_checkpoint,
+        init_mode=args.mode,
+    )
     print(f"training complete. run saved to {result['run_dir']}")
 
 

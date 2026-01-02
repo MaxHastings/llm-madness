@@ -222,6 +222,43 @@
             <div class="controls">
               <input id="runName" type="text" placeholder="Optional run name (e.g. baseline-001)" />
             </div>
+            <details class="advanced-panel">
+              <summary>Advanced options</summary>
+              <div class="controls">
+                <select id="runInitCheckpointSelect"></select>
+                <button id="refreshInitCheckpoints">Refresh Checkpoints</button>
+              </div>
+              <div class="meta" id="runInitCheckpointMeta"></div>
+              <div class="controls">
+                <select id="runInitModeSelect">
+                  <option value="fresh">Start fresh (no checkpoint)</option>
+                  <option value="fork">Warm start (fork)</option>
+                  <option value="resume">Resume (optimizer + RNG)</option>
+                </select>
+              </div>
+              <div class="meta">Overrides (leave blank to use config)</div>
+              <div class="controls">
+                <label>Learning rate <input id="runOverrideLearningRate" type="number" step="any" placeholder="e.g. 0.0003" /></label>
+                <label>Max iters <input id="runOverrideMaxIters" type="number" step="1" placeholder="e.g. 3000" /></label>
+              </div>
+              <div class="controls">
+                <label>Batch size <input id="runOverrideBatchSize" type="number" step="1" placeholder="e.g. 32" /></label>
+                <label>Eval interval <input id="runOverrideEvalInterval" type="number" step="1" placeholder="e.g. 200" /></label>
+              </div>
+              <div class="controls">
+                <label>Seed <input id="runOverrideSeed" type="number" step="1" placeholder="e.g. 1337" /></label>
+                <label>Device
+                  <select id="runOverrideDevice">
+                    <option value="">auto/cpu/cuda/mps</option>
+                    <option value="auto">auto</option>
+                    <option value="cpu">cpu</option>
+                    <option value="cuda">cuda</option>
+                    <option value="mps">mps</option>
+                  </select>
+                </label>
+              </div>
+              <div class="meta" id="runOverrideMeta"></div>
+            </details>
             <div class="controls">
               <button class="primary" id="runCreate">Create Run</button>
               <span class="meta" id="runSetupMeta"></span>

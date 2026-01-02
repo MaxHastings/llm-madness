@@ -20,6 +20,13 @@ import torch
 
 from llm_madness.datasets.manifest import create_dataset_manifest
 from llm_madness.tokenizer import load_tokenizer
+from llm_madness.checkpoints import (
+    checkpoint_supports_resume,
+    is_checkpoint_v2,
+    load_checkpoint,
+    validate_checkpoint,
+)
+from llm_madness.config import load_config
 from llm_madness.utils import find_latest_run, timestamp, write_json
 
 from .state import ServerState
@@ -186,6 +193,74 @@ def infer_stage(run_dir: Path, manifest: dict | None) -> str:
     return stage or "unknown"
 
 
+def build_model_config_from_training(config: dict, tokenizer_path: Path) -> dict:
+    tokenizer = load_tokenizer(tokenizer_path)
+    model_cfg = config.get("model", {}) if isinstance(config, dict) else {}
+    return {
+        "vocab_size": tokenizer.get_vocab_size(),
+        "block_size": int(model_cfg.get("block_size", 128)),
+        "n_layer": int(model_cfg.get("n_layer", 4)),
+        "n_head": int(model_cfg.get("n_head", 4)),
+        "n_embd": int(model_cfg.get("n_embd", 256)),
+    }
+
+
+def parse_checkpoint_iter(name: str) -> int | None:
+    if not name.startswith("checkpoint_") or not name.endswith(".pt"):
+        return None
+    raw = name[len("checkpoint_"):-3]
+    if not raw.isdigit():
+        return None
+    return int(raw)
+
+
+def list_training_checkpoints() -> list[dict]:
+    items: list[dict] = []
+    train_root = RUNS_ROOT / "train"
+    if not train_root.exists():
+        return items
+    for run_dir in sorted(train_root.iterdir(), reverse=True):
+        if not run_dir.is_dir():
+            continue
+        run_name = None
+        manifest_path = run_dir / "run.json"
+        if manifest_path.exists():
+            try:
+                manifest = json.loads(manifest_path.read_text())
+            except json.JSONDecodeError:
+                manifest = None
+            if isinstance(manifest, dict):
+                meta = manifest.get("config", {}).get("meta", {})
+                if isinstance(meta, dict):
+                    run_name = meta.get("name") or None
+        checkpoints_dir = run_dir / "checkpoints"
+        if checkpoints_dir.exists():
+            for path in sorted(checkpoints_dir.glob("*.pt")):
+                items.append(
+                    {
+                        "run_id": run_dir.name,
+                        "run_dir": str(run_dir),
+                        "run_name": run_name,
+                        "checkpoint": path.name,
+                        "checkpoint_path": str(path),
+                        "iter": parse_checkpoint_iter(path.name),
+                    }
+                )
+        latest = run_dir / "latest.pt"
+        if latest.exists():
+            items.append(
+                {
+                    "run_id": run_dir.name,
+                    "run_dir": str(run_dir),
+                    "run_name": run_name,
+                    "checkpoint": latest.name,
+                    "checkpoint_path": str(latest),
+                    "iter": None,
+                }
+            )
+    return items
+
+
 def check_run_process(run_id: str) -> tuple[bool, int | None]:
     info = RUN_PROCS.get(run_id)
     if not info:
@@ -261,6 +336,13 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
         duration_seconds = None
     duration = format_duration(duration_seconds)
     last_log = read_last_line(run_dir / "logs.jsonl") or read_last_line(run_dir / "process.log")
+    if not last_log and manifest and isinstance(manifest, dict):
+        last_log = manifest.get("error") or None
+    checkpoints_dir = run_dir / "checkpoints"
+    checkpoint_count = 0
+    if checkpoints_dir.exists():
+        checkpoint_count = len(list(checkpoints_dir.glob("checkpoint_*.pt")))
+    has_checkpoints = checkpoint_count > 0 or (run_dir / "latest.pt").exists()
     run_name = None
     if manifest and isinstance(manifest.get("config"), dict):
         meta = manifest.get("config", {}).get("meta", {})
@@ -278,6 +360,8 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
         "last_log": last_log,
         "has_manifest": has_manifest,
         "is_active": is_active,
+        "has_checkpoints": has_checkpoints,
+        "checkpoint_count": checkpoint_count,
     }
 
 
@@ -545,6 +629,9 @@ class Handler(BaseHTTPRequestHandler):
                     )
             self._send_json({"vocabs": vocabs})
             return
+        if self.path == "/api/checkpoints":
+            self._send_json({"checkpoints": list_training_checkpoints()})
+            return
         if self.path.startswith("/api/tokenizer_vocabs/report"):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
@@ -799,7 +886,6 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/decode",
                 "/api/ids_to_tokens",
                 "/api/next",
-                "/api/checkpoints",
                 "/api/load_checkpoint",
                 "/api/tokenizer_report",
                 "/api/training_logs",
@@ -825,6 +911,40 @@ class Handler(BaseHTTPRequestHandler):
                     for path in list_config_paths(scope):
                         configs.append(describe_config(path))
                 self._send_json({"configs": configs})
+                return
+            if self.path == "/api/checkpoint/compat":
+                payload = self._read_json()
+                checkpoint_path = payload.get("checkpoint_path")
+                config_name = payload.get("config")
+                tokenizer_path = payload.get("tokenizer_path")
+                if not checkpoint_path or not config_name or not tokenizer_path:
+                    self._send_json({"ok": False, "errors": ["checkpoint_path, config, tokenizer_path required"]})
+                    return
+                candidate = Path(str(checkpoint_path)).resolve()
+                if RUNS_ROOT.resolve() not in candidate.parents or not candidate.is_file():
+                    self._send_json({"ok": False, "errors": ["invalid checkpoint path"]})
+                    return
+                if config_name.startswith("configs/"):
+                    config_name = config_name[len("configs/"):]
+                config_path = (CONFIGS_DIR / config_name).resolve()
+                if CONFIGS_DIR.resolve() not in config_path.parents or not config_path.exists():
+                    self._send_json({"ok": False, "errors": ["invalid training config"]})
+                    return
+                tok_path = Path(str(tokenizer_path)).resolve()
+                if RUNS_ROOT.resolve() not in tok_path.parents or not tok_path.exists():
+                    self._send_json({"ok": False, "errors": ["invalid tokenizer path"]})
+                    return
+                try:
+                    training_config = load_config(config_path)
+                    model_config = build_model_config_from_training(training_config, tok_path)
+                    bundle = load_checkpoint(candidate, map_location="cpu")
+                    if not is_checkpoint_v2(bundle.payload):
+                        self._send_json({"ok": False, "errors": ["checkpoint must be v2; migrate first"]})
+                        return
+                    errors = validate_checkpoint(bundle.payload, model_config, tok_path)
+                    self._send_json({"ok": not errors, "errors": errors})
+                except Exception as exc:
+                    self._send_json({"ok": False, "errors": [str(exc)]})
                 return
             if self.path == "/api/configs/save":
                 payload = self._read_json()
@@ -899,6 +1019,9 @@ class Handler(BaseHTTPRequestHandler):
                 dataset_manifest = payload.get("dataset_manifest")
                 tokenizer_path = payload.get("tokenizer_path")
                 run_name = payload.get("run_name")
+                init_checkpoint = payload.get("init_checkpoint")
+                init_mode = payload.get("init_mode")
+                overrides = payload.get("overrides", {}) if isinstance(payload, dict) else {}
                 if stage not in {"tokenizer", "train"}:
                     self._send_json({"error": "unsupported stage"}, status=400)
                     return
@@ -931,6 +1054,26 @@ class Handler(BaseHTTPRequestHandler):
                         self._send_json({"error": "tokenizer path not found"}, status=404)
                         return
                     tokenizer_path_resolved = candidate
+                init_checkpoint_path = None
+                if init_checkpoint:
+                    candidate = Path(str(init_checkpoint)).resolve()
+                    if RUNS_ROOT.resolve() not in candidate.parents:
+                        self._send_json({"error": "invalid checkpoint path"}, status=400)
+                        return
+                    if not candidate.exists():
+                        self._send_json({"error": "checkpoint not found"}, status=404)
+                        return
+                    init_checkpoint_path = candidate
+                if init_mode:
+                    init_mode = str(init_mode).strip().lower()
+                    if init_mode not in {"fork", "resume"}:
+                        self._send_json({"error": "init_mode must be fork or resume"}, status=400)
+                        return
+                if init_checkpoint_path is not None and init_mode == "resume":
+                    ok, err = checkpoint_supports_resume(init_checkpoint_path)
+                    if not ok:
+                        self._send_json({"error": err or "checkpoint cannot resume"}, status=400)
+                        return
                 run_id = timestamp()
                 cmd = [sys.executable, "-m"]
                 if stage == "tokenizer":
@@ -950,8 +1093,16 @@ class Handler(BaseHTTPRequestHandler):
                         self._send_json({"error": "tokenizer vocab required for training run"}, status=400)
                         return
                     cmd += ["scripts.train_model", "--config", str(config_path), "--set", f"run.id={run_id}"]
+                    if isinstance(overrides, dict):
+                        for key, value in overrides.items():
+                            if value is None:
+                                continue
+                            cmd += ["--set", f"{key}={value}"]
                     cmd += ["--dataset-manifest", str(dataset_manifest_path)]
                     cmd += ["--tokenizer", str(tokenizer_path_resolved)]
+                    if init_checkpoint_path is not None:
+                        cmd += ["--init-checkpoint", str(init_checkpoint_path)]
+                        cmd += ["--mode", init_mode or "fork"]
                     run_dir = RUNS_ROOT / "train" / run_id
                 else:
                     self._send_json({"error": f"unknown stage '{stage}'"}, status=400)
@@ -1244,7 +1395,10 @@ def main() -> None:
         if not (run_dir / "run.json").exists():
             print(f"warning: run.json missing in {run_dir}; starting UI without a loaded run")
         else:
-            STATE = ServerState(run_dir, args.checkpoint, DEVICE_OVERRIDE)
+            try:
+                STATE = ServerState(run_dir, args.checkpoint, DEVICE_OVERRIDE)
+            except FileNotFoundError as exc:
+                print(f"warning: {exc}; starting UI without a loaded run")
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"server running on http://{args.host}:{args.port}")
     server.serve_forever()

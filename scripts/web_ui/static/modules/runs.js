@@ -493,7 +493,11 @@ async function showRunDetails(runDir) {
     process_log: data.process_log || [],
   };
   els.runDetailMeta.textContent = selectedRun ? `${selectedRun.stage} | ${selectedRun.run_id}` : 'Run detail';
-  els.runLoadStatus.textContent = 'Viewing run details.';
+  if (selectedRun && selectedRun.has_checkpoints === false) {
+    els.runLoadStatus.textContent = 'No checkpoints yet for this run.';
+  } else {
+    els.runLoadStatus.textContent = 'Viewing run details.';
+  }
   renderRunDetails(data.summary, data.manifest);
   updateRunHighlights(data.manifest, data.summary?.run_dir);
   if (selectedRun && selectedRun.stage === 'train') {

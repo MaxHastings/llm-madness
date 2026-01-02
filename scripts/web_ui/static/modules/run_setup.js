@@ -130,11 +130,75 @@ export function setTrainingConfigSelection(path) {
   els.trainingConfigSelect.value = path;
 }
 
+export async function loadInitCheckpoints() {
+  const priorSelection = els.runInitCheckpointSelect.value;
+  const data = await fetchJson('/api/checkpoints');
+  const items = data.checkpoints || [];
+  els.runInitCheckpointSelect.innerHTML = '';
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = 'Start fresh (no checkpoint)';
+  els.runInitCheckpointSelect.appendChild(none);
+  const available = new Set();
+  items.forEach((item) => {
+    const opt = document.createElement('option');
+    opt.value = item.checkpoint_path;
+    const name = item.run_name ? `${item.run_name} (${item.run_id})` : item.run_id;
+    const meta = item.iter != null ? `iter ${item.iter}` : item.checkpoint;
+    opt.textContent = `${name} • ${meta}`;
+    els.runInitCheckpointSelect.appendChild(opt);
+    available.add(opt.value);
+  });
+  if (priorSelection && available.has(priorSelection)) {
+    els.runInitCheckpointSelect.value = priorSelection;
+  }
+  checkCheckpointCompatibility();
+}
+
+async function checkCheckpointCompatibility() {
+  const checkpointPath = els.runInitCheckpointSelect.value;
+  if (!checkpointPath) {
+    if (els.runInitCheckpointMeta) {
+      els.runInitCheckpointMeta.textContent = '';
+    }
+    return;
+  }
+  const trainingConfig = els.trainingConfigSelect.value;
+  const tokenizerPath = els.runTokenizerVocabSelect.value;
+  if (!trainingConfig || !tokenizerPath) {
+    if (els.runInitCheckpointMeta) {
+      els.runInitCheckpointMeta.textContent = 'Select a tokenizer vocab and training config to validate.';
+    }
+    return;
+  }
+  try {
+    const data = await api('/api/checkpoint/compat', {
+      checkpoint_path: checkpointPath,
+      config: trainingConfig,
+      tokenizer_path: tokenizerPath,
+    });
+    if (!els.runInitCheckpointMeta) return;
+    if (data.ok) {
+      els.runInitCheckpointMeta.textContent = 'Checkpoint compatible.';
+    } else {
+      const errors = (data.errors || []).join(' | ') || 'Checkpoint incompatible.';
+      els.runInitCheckpointMeta.textContent = errors;
+    }
+  } catch (err) {
+    if (els.runInitCheckpointMeta) {
+      els.runInitCheckpointMeta.textContent = `Compatibility check failed: ${err.message}`;
+    }
+  }
+}
+
 async function createTrainRun() {
   const datasetManifest = els.datasetSelect.value;
   const tokenizerPath = els.runTokenizerVocabSelect.value;
   const trainingConfig = els.trainingConfigSelect.value;
   const runName = (els.runName?.value || '').trim();
+  let initCheckpoint = els.runInitCheckpointSelect.value;
+  let initMode = (els.runInitModeSelect.value || '').trim().toLowerCase();
+  const overrides = {};
   if (!datasetManifest) {
     els.runSetupMeta.textContent = 'Select a dataset.';
     return;
@@ -147,12 +211,70 @@ async function createTrainRun() {
     els.runSetupMeta.textContent = 'Select a training config.';
     return;
   }
+  if (!initCheckpoint) {
+    initCheckpoint = null;
+    initMode = 'fresh';
+  } else if (!initMode || initMode === 'fresh') {
+    initMode = 'fork';
+  }
+  const lr = (els.runOverrideLearningRate?.value || '').trim();
+  if (lr) {
+    const parsed = Number(lr);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      els.runSetupMeta.textContent = 'Invalid learning rate override.';
+      return;
+    }
+    overrides['training.learning_rate'] = String(parsed);
+  }
+  const maxIters = (els.runOverrideMaxIters?.value || '').trim();
+  if (maxIters) {
+    const parsed = Number(maxIters);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      els.runSetupMeta.textContent = 'Invalid max iters override.';
+      return;
+    }
+    overrides['training.max_iters'] = String(parsed);
+  }
+  const batchSize = (els.runOverrideBatchSize?.value || '').trim();
+  if (batchSize) {
+    const parsed = Number(batchSize);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      els.runSetupMeta.textContent = 'Invalid batch size override.';
+      return;
+    }
+    overrides['training.batch_size'] = String(parsed);
+  }
+  const evalInterval = (els.runOverrideEvalInterval?.value || '').trim();
+  if (evalInterval) {
+    const parsed = Number(evalInterval);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      els.runSetupMeta.textContent = 'Invalid eval interval override.';
+      return;
+    }
+    overrides['training.eval_interval'] = String(parsed);
+  }
+  const seed = (els.runOverrideSeed?.value || '').trim();
+  if (seed) {
+    const parsed = Number(seed);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      els.runSetupMeta.textContent = 'Invalid seed override.';
+      return;
+    }
+    overrides.seed = String(parsed);
+  }
+  const device = (els.runOverrideDevice?.value || '').trim();
+  if (device) {
+    overrides['training.device'] = device;
+  }
   const payload = {
     stage: 'train',
     config: trainingConfig,
     dataset_manifest: datasetManifest,
     tokenizer_path: tokenizerPath,
     run_name: runName || null,
+    init_checkpoint: initCheckpoint,
+    init_mode: initCheckpoint ? initMode : null,
+    overrides,
   };
   const data = await api('/api/run', payload);
   els.runSetupMeta.textContent = data.run_id ? `started train (${data.run_id})` : data.error || 'run failed';
@@ -164,9 +286,14 @@ export function initRunSetup() {
   els.refreshDatasetsBtn.addEventListener('click', loadDatasets);
   els.refreshTokenizerVocabsBtn.addEventListener('click', loadTokenizerVocabs);
   els.refreshTrainingConfigsBtn.addEventListener('click', loadTrainingConfigs);
+  els.refreshInitCheckpointsBtn.addEventListener('click', loadInitCheckpoints);
+  els.runInitCheckpointSelect.addEventListener('change', checkCheckpointCompatibility);
+  els.trainingConfigSelect.addEventListener('change', checkCheckpointCompatibility);
+  els.runTokenizerVocabSelect.addEventListener('change', checkCheckpointCompatibility);
   loadDatasets();
   loadTokenizerVocabs();
   loadTrainingConfigs();
+  loadInitCheckpoints();
   onEvent('datasets:changed', loadDatasets);
   onEvent('tokenizer_vocabs:changed', loadTokenizerVocabs);
   onEvent('training_configs:changed', loadTrainingConfigs);
@@ -184,5 +311,10 @@ export function initRunSetup() {
     intervalMs: 30000,
     isEnabled: () => isSectionActive('runs'),
     task: loadTrainingConfigs,
+  });
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('runs'),
+    task: loadInitCheckpoints,
   });
 }

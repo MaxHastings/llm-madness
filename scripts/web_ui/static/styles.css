@@ -472,6 +472,16 @@ textarea {
   margin-bottom: 8px;
 }
 
+.controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
 button, select, input {
   font-family: var(--sans);
   font-size: 12px;
@@ -740,6 +750,35 @@ button.token-btn:hover {
   font-weight: 600;
   color: #4a4139;
   margin-bottom: 8px;
+}
+
+.advanced-panel {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fffdfa;
+  margin-bottom: 8px;
+}
+
+.advanced-panel summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a4139;
+  list-style: none;
+  margin-bottom: 8px;
+}
+
+.advanced-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-panel[open] summary {
+  margin-bottom: 10px;
+}
+
+.advanced-panel .meta {
+  color: var(--muted);
 }
 
 .run-highlights {

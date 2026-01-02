@@ -79,6 +79,18 @@ export const els = {
   trainingConfigSelect: byId('trainingConfigSelect'),
   refreshTrainingConfigsBtn: byId('refreshTrainingConfigs'),
 
+  runInitCheckpointSelect: byId('runInitCheckpointSelect'),
+  refreshInitCheckpointsBtn: byId('refreshInitCheckpoints'),
+  runInitModeSelect: byId('runInitModeSelect'),
+  runInitCheckpointMeta: byId('runInitCheckpointMeta'),
+  runOverrideLearningRate: byId('runOverrideLearningRate'),
+  runOverrideMaxIters: byId('runOverrideMaxIters'),
+  runOverrideBatchSize: byId('runOverrideBatchSize'),
+  runOverrideEvalInterval: byId('runOverrideEvalInterval'),
+  runOverrideSeed: byId('runOverrideSeed'),
+  runOverrideDevice: byId('runOverrideDevice'),
+  runOverrideMeta: byId('runOverrideMeta'),
+
   tokenizerConfigList: byId('tokenizerConfigList'),
   tokenizerConfigEditor: byId('tokenizerConfigEditor'),
   tokenizerConfigMeta: byId('tokenizerConfigMeta'),
