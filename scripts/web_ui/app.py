@@ -26,6 +26,7 @@ from llm_madness.checkpoints import (
     load_checkpoint,
     validate_checkpoint,
 )
+from llm_madness.runs import finish_manifest
 from llm_madness.config import load_config
 from llm_madness.utils import find_latest_run, timestamp, write_json
 
@@ -1140,6 +1141,10 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 proc = info["process"]
                 proc.terminate()
+                try:
+                    finish_manifest(Path(info["run_dir"]), "stopped", error="stopped by user")
+                except Exception:
+                    pass
                 self._send_json({"status": "stopping", "run_id": run_id})
                 return
             if self.path == "/api/run/delete":
