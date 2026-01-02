@@ -50,6 +50,20 @@ function formatRunLabel(runDir) {
   return `run ${parts[parts.length - 1] || runDir}`;
 }
 
+function formatApiError(err, fallback) {
+  if (!err) return fallback;
+  const message = err.message || String(err);
+  try {
+    const parsed = JSON.parse(message);
+    if (parsed && typeof parsed === 'object') {
+      return parsed.error || parsed.message || fallback || message;
+    }
+  } catch (parseError) {
+    // Not JSON, use the raw message.
+  }
+  return message || fallback;
+}
+
 let logStream = null;
 let selectedRunDir = null;
 let activeVocabTab = 'report';
@@ -383,20 +397,24 @@ async function createVocab() {
     els.tokenizerVocabMeta.textContent = 'Select a dataset manifest.';
     return;
   }
-  const res = await api('/api/run', {
-    stage: 'tokenizer',
-    config,
-    dataset_manifest: datasetManifest,
-    run_name: runName || null,
-  });
-  if (res.run_id) {
-    els.tokenizerVocabMeta.textContent = `started tokenizer run ${res.run_id}`;
-    startLogStream(res.run_dir);
-  } else {
-    els.tokenizerVocabMeta.textContent = res.error || 'run failed';
+  try {
+    const res = await api('/api/run', {
+      stage: 'tokenizer',
+      config,
+      dataset_manifest: datasetManifest,
+      run_name: runName || null,
+    });
+    if (res.run_id) {
+      els.tokenizerVocabMeta.textContent = `started tokenizer run ${res.run_id}`;
+      startLogStream(res.run_dir);
+    } else {
+      els.tokenizerVocabMeta.textContent = res.error || 'run failed';
+    }
+    await loadVocabList();
+    emitEvent('tokenizer_vocabs:changed');
+  } catch (err) {
+    els.tokenizerVocabMeta.textContent = formatApiError(err, 'run failed');
   }
-  await loadVocabList();
-  emitEvent('tokenizer_vocabs:changed');
 }
 
 export function initTokenizerVocabs() {
