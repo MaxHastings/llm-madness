@@ -19,6 +19,11 @@ export function renderLossChart(container, logs, options = {}) {
   const margin = { top: 12, right: 36, bottom: 28, left: 40 };
   const plotW = Math.max(10, width - margin.left - margin.right);
   const plotH = Math.max(10, height - margin.top - margin.bottom);
+  const styles = getComputedStyle(document.documentElement);
+  const axisColor = styles.getPropertyValue('--chart-axis').trim() || '#cbbfb1';
+  const labelColor = styles.getPropertyValue('--chart-label').trim() || '#6e665d';
+  const trainColor = styles.getPropertyValue('--chart-train').trim() || '#ff6b35';
+  const valColor = styles.getPropertyValue('--chart-val').trim() || '#1f7a8c';
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('width', width);
@@ -66,7 +71,6 @@ export function renderLossChart(container, logs, options = {}) {
   }
 
   function drawAxis() {
-    const axisColor = '#cbbfb1';
     const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     xAxis.setAttribute('x1', margin.left);
     xAxis.setAttribute('y1', margin.top + plotH);
@@ -101,7 +105,7 @@ export function renderLossChart(container, logs, options = {}) {
       label.setAttribute('y', margin.top + plotH + 18);
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('font-size', '10');
-      label.setAttribute('fill', '#6e665d');
+      label.setAttribute('fill', labelColor);
       label.textContent = Math.round(iter);
       svg.appendChild(label);
     }
@@ -115,7 +119,7 @@ export function renderLossChart(container, logs, options = {}) {
       leftLabel.setAttribute('y', yLeft + 3);
       leftLabel.setAttribute('text-anchor', 'end');
       leftLabel.setAttribute('font-size', '10');
-      leftLabel.setAttribute('fill', '#ff6b35');
+      leftLabel.setAttribute('fill', trainColor);
       leftLabel.textContent = trainVal.toFixed(2);
       svg.appendChild(leftLabel);
 
@@ -126,7 +130,7 @@ export function renderLossChart(container, logs, options = {}) {
       rightLabel.setAttribute('y', yRight + 3);
       rightLabel.setAttribute('text-anchor', 'start');
       rightLabel.setAttribute('font-size', '10');
-      rightLabel.setAttribute('fill', '#1f7a8c');
+      rightLabel.setAttribute('fill', valColor);
       rightLabel.textContent = valVal.toFixed(2);
       svg.appendChild(rightLabel);
     }
@@ -136,7 +140,7 @@ export function renderLossChart(container, logs, options = {}) {
     xLabel.setAttribute('y', height - 4);
     xLabel.setAttribute('text-anchor', 'middle');
     xLabel.setAttribute('font-size', '10');
-    xLabel.setAttribute('fill', '#6e665d');
+    xLabel.setAttribute('fill', labelColor);
     xLabel.textContent = 'iteration';
     svg.appendChild(xLabel);
 
@@ -145,7 +149,7 @@ export function renderLossChart(container, logs, options = {}) {
     leftLabel.setAttribute('y', margin.top + plotH / 2);
     leftLabel.setAttribute('text-anchor', 'middle');
     leftLabel.setAttribute('font-size', '10');
-    leftLabel.setAttribute('fill', '#ff6b35');
+    leftLabel.setAttribute('fill', trainColor);
     leftLabel.setAttribute('transform', `rotate(-90 10 ${margin.top + plotH / 2})`);
     leftLabel.textContent = 'train loss';
     svg.appendChild(leftLabel);
@@ -155,7 +159,7 @@ export function renderLossChart(container, logs, options = {}) {
     rightLabel.setAttribute('y', margin.top + plotH / 2);
     rightLabel.setAttribute('text-anchor', 'middle');
     rightLabel.setAttribute('font-size', '10');
-    rightLabel.setAttribute('fill', '#1f7a8c');
+    rightLabel.setAttribute('fill', valColor);
     rightLabel.setAttribute('transform', `rotate(-90 ${width - 10} ${margin.top + plotH / 2})`);
     rightLabel.textContent = 'val loss';
     svg.appendChild(rightLabel);
@@ -166,14 +170,14 @@ export function renderLossChart(container, logs, options = {}) {
     legend.setAttribute('x', margin.left + 6);
     legend.setAttribute('y', margin.top + 12);
     legend.setAttribute('font-size', '10');
-    legend.setAttribute('fill', '#6e665d');
+    legend.setAttribute('fill', labelColor);
     legend.textContent = 'train (orange, left) / val (blue, right)';
     svg.appendChild(legend);
   }
 
   drawAxis();
-  drawLine(trainRows, '#ff6b35', 'train_loss', minTrain, maxTrain);
-  drawLine(valRows, '#1f7a8c', 'val_loss', minVal, maxVal);
+  drawLine(trainRows, trainColor, 'train_loss', minTrain, maxTrain);
+  drawLine(valRows, valColor, 'val_loss', minVal, maxVal);
   drawLegend();
   container.appendChild(svg);
 }

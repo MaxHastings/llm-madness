@@ -8,7 +8,9 @@ import { initDatasets } from './modules/datasets.js';
 import { initTokenizerConfigs } from './modules/tokenizer_configs.js';
 import { initTokenizerVocabs } from './modules/tokenizer_vocabs.js';
 import { initTrainingConfigs } from './modules/training_configs.js';
+import { initTheme } from './modules/theme.js';
 
+initTheme();
 initNav();
 initSession();
 initPrompt();

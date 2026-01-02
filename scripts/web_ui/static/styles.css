@@ -1,15 +1,86 @@
 :root {
   --bg: #efe7da;
+  --bg-gradient: radial-gradient(circle at top left, #f6f0e8 0%, #eadfce 55%, #e7dac7 100%);
+  --sidebar: #fbf8f3;
   --panel: #ffffff;
+  --panel-2: #fcfaf6;
+  --panel-3: #f3ede3;
+  --panel-4: #fdf9f3;
+  --panel-5: #fff3e4;
+  --panel-6: #f7f1e8;
+  --panel-7: #fffdfa;
   --ink: #1f1b17;
   --muted: #6e665d;
   --accent: #ff6b35;
   --accent-2: #1f7a8c;
   --border: #e2d6c7;
   --shadow: rgba(47, 38, 30, 0.14);
+  --chip-bg: #f0e5d6;
+  --chip-ink: #7a5f42;
+  --token-bg: #fdf9f3;
+  --token-active-bg: #e8f3f5;
+  --token-active-ring: rgba(31, 122, 140, 0.25);
+  --chart-bg: #fcfaf6;
+  --chart-axis: #cbbfb1;
+  --chart-label: #6e665d;
+  --chart-train: #ff6b35;
+  --chart-val: #1f7a8c;
+  --status-running-bg: #ffe1b8;
+  --status-running-ink: #8a4b12;
+  --status-queued-bg: #fde8c9;
+  --status-queued-ink: #8a6c2a;
+  --status-completed-bg: #dff4e0;
+  --status-completed-ink: #2f6a3c;
+  --status-failed-bg: #f7d7d5;
+  --status-failed-ink: #8a2f2b;
+  --status-stopped-bg: #e5e1dd;
+  --status-stopped-ink: #5d5a57;
+  --status-unknown-bg: #efe8df;
+  --status-unknown-ink: #6e665d;
   --scroll-max: 360px;
   --mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --sans: "IBM Plex Sans", "Fira Sans", "Segoe UI", sans-serif;
+}
+
+[data-theme="dark"] {
+  --bg: #14110f;
+  --bg-gradient: radial-gradient(circle at top left, #1c1815 0%, #14110f 52%, #100d0b 100%);
+  --sidebar: #191512;
+  --panel: #1e1a17;
+  --panel-2: #231f1b;
+  --panel-3: #2a241f;
+  --panel-4: #26211d;
+  --panel-5: #2f271f;
+  --panel-6: #2b241f;
+  --panel-7: #231f1c;
+  --ink: #f3eee7;
+  --muted: #b3a89b;
+  --accent: #ff8f5a;
+  --accent-2: #4bb2c1;
+  --border: #3a2f25;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --chip-bg: #3a2f23;
+  --chip-ink: #e2c8a8;
+  --token-bg: #221d19;
+  --token-active-bg: #1e2f33;
+  --token-active-ring: rgba(75, 178, 193, 0.35);
+  --chart-bg: #1b1714;
+  --chart-axis: #4e4136;
+  --chart-label: #b3a89b;
+  --chart-train: #ff9a6a;
+  --chart-val: #55c0d0;
+  --status-running-bg: #5b3b17;
+  --status-running-ink: #ffcf9a;
+  --status-queued-bg: #5a4521;
+  --status-queued-ink: #ffdca6;
+  --status-completed-bg: #1f3a2a;
+  --status-completed-ink: #b9e7c2;
+  --status-failed-bg: #4a2220;
+  --status-failed-ink: #f3b1ad;
+  --status-stopped-bg: #2f2b27;
+  --status-stopped-ink: #c4beb8;
+  --status-unknown-bg: #322b26;
+  --status-unknown-ink: #b3a89b;
 }
 
 * { box-sizing: border-box; }
@@ -17,7 +88,8 @@
 body {
   margin: 0;
   font-family: var(--sans);
-  background: radial-gradient(circle at top left, #f6f0e8 0%, #eadfce 55%, #e7dac7 100%);
+  background-color: var(--bg);
+  background-image: var(--bg-gradient);
   color: var(--ink);
 }
 
@@ -30,7 +102,7 @@ body {
 .sidebar {
   padding: 20px 18px;
   border-right: 1px solid var(--border);
-  background: #fbf8f3;
+  background: var(--sidebar);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -55,11 +127,36 @@ body {
   gap: 8px;
 }
 
+.theme-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--panel-7);
+}
+
+.theme-switch span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.theme-toggle {
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--panel-3);
+  font-size: 11px;
+}
+
 .nav-btn {
   border-radius: 10px;
   padding: 9px 12px;
   border: 1px solid var(--border);
-  background: #f3ede3;
+  background: var(--panel-3);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -198,7 +295,7 @@ main {
   border-radius: 999px;
   padding: 6px 28px 6px 12px;
   border: 1px solid var(--border);
-  background: #f3ede3;
+  background: var(--panel-3);
   font-size: 11px;
   font-family: var(--sans);
 }
@@ -207,7 +304,7 @@ main {
   border-radius: 999px;
   padding: 6px 12px;
   border: 1px solid var(--border);
-  background: #f3ede3;
+  background: var(--panel-3);
   font-size: 11px;
 }
 
@@ -244,8 +341,8 @@ main {
 
 .selectable-card.selected {
   border-color: var(--accent-2);
-  background: #fff3e4;
-  box-shadow: 0 10px 20px rgba(145, 94, 38, 0.08);
+  background: var(--panel-5);
+  box-shadow: 0 10px 20px var(--shadow);
 }
 
 .vocab-list {
@@ -282,7 +379,7 @@ main {
 .summary-grid {
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fcfaf6;
+  background: var(--panel-2);
   padding: 10px;
   display: grid;
   gap: 6px;
@@ -328,7 +425,7 @@ main {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--ink);
-  background: #fcfaf6;
+  background: var(--panel-2);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -336,7 +433,7 @@ main {
 .token-listing {
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fcfaf6;
+  background: var(--panel-2);
   padding: 10px;
   display: grid;
   gap: 6px;
@@ -365,7 +462,7 @@ main {
 .manifest-files {
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fcfaf6;
+  background: var(--panel-2);
   padding: 10px;
   display: grid;
   gap: 6px;
@@ -414,7 +511,7 @@ main {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: #fcfaf6;
+  background: var(--panel-2);
 }
 
 .artifact-title {
@@ -461,7 +558,8 @@ textarea {
   border-radius: 8px;
   font-family: var(--mono);
   font-size: 13px;
-  background: #fcfaf6;
+  background: var(--panel-2);
+  color: var(--ink);
 }
 
 .controls {
@@ -488,8 +586,13 @@ button, select, input {
   padding: 7px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: #f3ede3;
+  background: var(--panel-3);
   color: var(--ink);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
 }
 
 button.primary {
@@ -499,14 +602,14 @@ button.primary {
 }
 
 button.token-btn {
-  background: #f8f2e9;
+  background: var(--panel-4);
   border-color: var(--border);
   font-family: var(--mono);
   font-size: 12px;
 }
 
 button.token-btn:hover {
-  background: #ffe6da;
+  background: var(--panel-5);
 }
 
 .token-list {
@@ -527,13 +630,13 @@ button.token-btn:hover {
   padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #fdf9f3;
+  background: var(--token-bg);
 }
 
 .token.active {
   border-color: var(--accent-2);
-  background: #e8f3f5;
-  box-shadow: 0 0 0 1px rgba(31, 122, 140, 0.25);
+  background: var(--token-active-bg);
+  box-shadow: 0 0 0 1px var(--token-active-ring);
 }
 
 .meta {
@@ -549,7 +652,7 @@ button.token-btn:hover {
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: #f3f7f8;
+  background: var(--panel-2);
   color: var(--accent-2);
   font-size: 11px;
 }
@@ -557,7 +660,7 @@ button.token-btn:hover {
 .chart {
   width: 100%;
   height: 180px;
-  background: #fcfaf6;
+  background: var(--chart-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 4px;
@@ -569,7 +672,7 @@ button.token-btn:hover {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fcfaf6;
+  background: var(--panel-2);
   padding: 8px;
   font-family: var(--mono);
   font-size: 12px;
@@ -581,7 +684,7 @@ button.token-btn:hover {
   gap: 6px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fcfaf6;
+  background: var(--panel-2);
   padding: 8px;
   max-height: 360px;
   overflow: auto;
@@ -628,7 +731,7 @@ button.token-btn:hover {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  background: #fdf9f3;
+  background: var(--panel-4);
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
@@ -637,8 +740,8 @@ button.token-btn:hover {
 
 .run-item.selected {
   border-color: var(--accent-2);
-  background: #fff3e4;
-  box-shadow: 0 10px 20px rgba(145, 94, 38, 0.08);
+  background: var(--panel-5);
+  box-shadow: 0 10px 20px var(--shadow);
 }
 
 .run-item button {
@@ -688,8 +791,8 @@ button.token-btn:hover {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  background: #f0e5d6;
-  color: #7a5f42;
+  background: var(--chip-bg);
+  color: var(--chip-ink);
 }
 
 .run-id {
@@ -711,12 +814,12 @@ button.token-btn:hover {
   letter-spacing: 0.06em;
 }
 
-.status-running { background: #ffe1b8; color: #8a4b12; }
-.status-queued { background: #fde8c9; color: #8a6c2a; }
-.status-completed { background: #dff4e0; color: #2f6a3c; }
-.status-failed { background: #f7d7d5; color: #8a2f2b; }
-.status-stopped { background: #e5e1dd; color: #5d5a57; }
-.status-unknown { background: #efe8df; color: #6e665d; }
+.status-running { background: var(--status-running-bg); color: var(--status-running-ink); }
+.status-queued { background: var(--status-queued-bg); color: var(--status-queued-ink); }
+.status-completed { background: var(--status-completed-bg); color: var(--status-completed-ink); }
+.status-failed { background: var(--status-failed-bg); color: var(--status-failed-ink); }
+.status-stopped { background: var(--status-stopped-bg); color: var(--status-stopped-ink); }
+.status-unknown { background: var(--status-unknown-bg); color: var(--status-unknown-ink); }
 
 .run-duration {
   font-family: var(--mono);
@@ -740,7 +843,7 @@ button.token-btn:hover {
 .runs-section {
   border: 1px dashed var(--border);
   border-radius: 12px;
-  background: #fffdfa;
+  background: var(--panel-7);
   padding: 8px 10px;
 }
 
@@ -748,7 +851,7 @@ button.token-btn:hover {
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  color: #4a4139;
+  color: var(--ink);
   margin-bottom: 8px;
 }
 
@@ -756,7 +859,7 @@ button.token-btn:hover {
   border: 1px dashed var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  background: #fffdfa;
+  background: var(--panel-7);
   margin-bottom: 8px;
 }
 
@@ -764,7 +867,7 @@ button.token-btn:hover {
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  color: #4a4139;
+  color: var(--ink);
   list-style: none;
   margin-bottom: 8px;
 }
@@ -786,7 +889,7 @@ button.token-btn:hover {
   gap: 8px;
   padding: 10px;
   border-radius: 10px;
-  background: #f7f1e8;
+  background: var(--panel-6);
   border: 1px solid var(--border);
   font-family: var(--mono);
   font-size: 12px;
@@ -834,7 +937,7 @@ button.token-btn:hover {
 .run-detail {
   margin-top: 10px;
   padding: 10px;
-  background: #fcfaf6;
+  background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 8px;
   max-height: 220px;
@@ -885,7 +988,7 @@ button.token-btn:hover {
   padding: 4px 6px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: #fdf5ee;
+  background: var(--panel-4);
   font-family: var(--mono);
   font-size: 11px;
 }
