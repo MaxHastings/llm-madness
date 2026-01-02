@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "id": "tokenizer_default",
+    "name": "default",
+    "version": 2,
+    "created_at": "2025-12-31T19:05:06",
+    "parent_id": "tokenizer_default"
+  },
+  "algorithm": "bpe",
+  "vocab_size": 4096,
+  "min_frequency": 2,
+  "special_tokens": [
+    "<|unk|>",
+    "<|begin|>",
+    "<|end|>",
+    "<|endoftext|>"
+  ],
+  "discover_special_token_regex": "<\\|speaker=[^|]+\\|>",
+  "add_prefix_space": false,
+  "byte_level": true,
+  "split_digits": true
+}

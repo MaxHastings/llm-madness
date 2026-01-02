@@ -3,7 +3,7 @@
   "paths": { "data_root": "data", "runs_root": "runs" },
   "tokenizer": {
     "enabled": true,
-    "config": "configs/tokenizer/default__v001.json",
+    "config": "configs/tokenizer/default__v002.json",
     "input": null,
     "output_dir": "runs/tokenizer"
   },

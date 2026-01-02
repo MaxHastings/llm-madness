@@ -11,7 +11,7 @@ from llm_madness.stages.tokenizer import run_tokenizer
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train a BPE tokenizer.")
-    parser.add_argument("--config", type=Path, default=Path("configs/tokenizer/default__v001.json"))
+    parser.add_argument("--config", type=Path, default=Path("configs/tokenizer/default__v002.json"))
     parser.add_argument("--input", type=Path, default=None)
     parser.add_argument("--dataset-manifest", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
