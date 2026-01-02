@@ -49,7 +49,7 @@ def finish_manifest(
     path = run_dir / "run.json"
     payload: dict[str, Any] = {}
     if path.exists():
-        payload = Path(path).read_text()
+        payload = Path(path).read_text(encoding="utf-8")
     if isinstance(payload, str):
         import json
 

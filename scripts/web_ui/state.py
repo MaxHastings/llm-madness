@@ -14,7 +14,7 @@ from llm_madness.utils import find_latest_run
 class ServerState:
     def __init__(self, run_dir: Path, checkpoint: str | None, device_override: str):
         self.run_dir = run_dir
-        self.run_config = json.loads((run_dir / "run.json").read_text())
+        self.run_config = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
         self.tokenizer = load_tokenizer(self._resolve_tokenizer_path())
         data_path = self.run_config.get("inputs", {}).get("data")
         self.data_path = self._resolve_data_path(data_path) if data_path else None
@@ -86,7 +86,7 @@ class ServerState:
         if self.data_path is None or not self.data_path.exists():
             detail = self.data_path_error or "data_path missing; rerun training with a dataset"
             return {"error": detail}
-        text = self.data_path.read_text(errors="ignore")
+        text = self.data_path.read_text(encoding="utf-8", errors="replace")
         if len(text) > max_chars:
             text = text[:max_chars]
 
@@ -131,7 +131,7 @@ class ServerState:
         samples_path = self.run_dir / "samples.jsonl"
         logs = []
         if logs_path.exists():
-            for line in logs_path.read_text().splitlines():
+            for line in logs_path.read_text(encoding="utf-8", errors="replace").splitlines():
                 if not line.strip():
                     continue
                 try:
@@ -140,7 +140,7 @@ class ServerState:
                     continue
         samples = []
         if samples_path.exists():
-            for line in samples_path.read_text().splitlines():
+            for line in samples_path.read_text(encoding="utf-8", errors="replace").splitlines():
                 if not line.strip():
                     continue
                 try:

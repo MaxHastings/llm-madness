@@ -19,15 +19,15 @@ def ensure_dir(path: Path | str) -> Path:
 
 
 def read_text(path: Path | str) -> str:
-    return Path(path).read_text()
+    return Path(path).read_text(encoding="utf-8")
 
 
 def write_text(path: Path | str, text: str) -> None:
-    Path(path).write_text(text)
+    Path(path).write_text(text, encoding="utf-8")
 
 
 def write_json(path: Path | str, data: dict) -> None:
-    Path(path).write_text(json.dumps(data, indent=2, sort_keys=True))
+    Path(path).write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def sha256_text(text: str) -> str:

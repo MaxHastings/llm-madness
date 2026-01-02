@@ -33,7 +33,8 @@ def train_bpe_tokenizer(
 ) -> dict:
     input_path = Path(input_path)
     print(f"[tokenizer] loading input {input_path}", flush=True)
-    text = input_path.read_text()
+    # Read as UTF-8 so special-token discovery won't choke on bad bytes.
+    text = input_path.read_text(encoding="utf-8", errors="replace")
     print(f"[tokenizer] input length {len(text)} chars", flush=True)
 
     discovered: list[str] = []

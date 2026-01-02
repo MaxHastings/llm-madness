@@ -167,7 +167,7 @@ def describe_config(path: Path) -> dict:
     rel = str(path.relative_to(CONFIGS_DIR))
     payload: dict = {}
     try:
-        payload = json.loads(path.read_text())
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         payload = {}
     meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
@@ -227,7 +227,7 @@ def list_training_checkpoints() -> list[dict]:
         manifest_path = run_dir / "run.json"
         if manifest_path.exists():
             try:
-                manifest = json.loads(manifest_path.read_text())
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 manifest = None
             if isinstance(manifest, dict):
@@ -308,7 +308,7 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
     has_manifest = manifest is not None or manifest_path.exists()
     if manifest is None and has_manifest:
         try:
-            manifest = json.loads(manifest_path.read_text())
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             manifest = None
     if manifest is not None and not isinstance(manifest, dict):
@@ -394,7 +394,7 @@ def build_tokenizer_report(run_dir: Path, top_n: int = 25, max_chars: int = 200_
     if not manifest_path.exists():
         return {"error": "run.json missing for this run"}
     try:
-        run_config = json.loads(manifest_path.read_text())
+        run_config = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {"error": "run.json is invalid"}
 
@@ -415,7 +415,7 @@ def build_tokenizer_report(run_dir: Path, top_n: int = 25, max_chars: int = 200_
         return {"error": f"missing data file: {data_path_raw}"}
 
     tokenizer = load_tokenizer(tokenizer_path)
-    text = data_path.read_text(errors="ignore")
+    text = data_path.read_text(encoding="utf-8", errors="replace")
     if len(text) > max_chars:
         text = text[:max_chars]
 
@@ -540,7 +540,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not manifest_path.exists():
                         continue
                     try:
-                        manifest = json.loads(manifest_path.read_text())
+                        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                     except json.JSONDecodeError:
                         continue
                     datasets.append(
@@ -571,7 +571,7 @@ class Handler(BaseHTTPRequestHandler):
             if not target.exists() or not target.is_file():
                 self._send_json({"error": "manifest not found"}, status=404)
                 return
-            raw = target.read_text()
+            raw = target.read_text(encoding="utf-8")
             try:
                 parsed_manifest = json.loads(raw)
             except json.JSONDecodeError:
@@ -588,7 +588,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not manifest_path.exists():
                         continue
                     try:
-                        manifest = json.loads(manifest_path.read_text())
+                        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                     except json.JSONDecodeError:
                         continue
                     if not isinstance(manifest, dict):
@@ -606,7 +606,7 @@ class Handler(BaseHTTPRequestHandler):
                     report = {}
                     if report_path.exists():
                         try:
-                            report = json.loads(report_path.read_text())
+                            report = json.loads(report_path.read_text(encoding="utf-8"))
                         except json.JSONDecodeError:
                             report = {}
                     config = manifest.get("config", {})
@@ -617,7 +617,7 @@ class Handler(BaseHTTPRequestHandler):
                     dataset_id = None
                     if dataset_manifest:
                         try:
-                            dataset_payload = json.loads(Path(dataset_manifest).read_text())
+                            dataset_payload = json.loads(Path(dataset_manifest).read_text(encoding="utf-8"))
                             if isinstance(dataset_payload, dict):
                                 dataset_name = dataset_payload.get("name")
                                 dataset_id = dataset_payload.get("id")
@@ -679,17 +679,17 @@ class Handler(BaseHTTPRequestHandler):
             config_path = run_path / "tokenizer_config.json"
             if manifest_path.exists():
                 try:
-                    manifest = json.loads(manifest_path.read_text())
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                 except json.JSONDecodeError:
                     manifest = None
             if report_path.exists():
                 try:
-                    report = json.loads(report_path.read_text())
+                    report = json.loads(report_path.read_text(encoding="utf-8"))
                 except json.JSONDecodeError:
                     report = None
             if config_path.exists():
                 try:
-                    config = json.loads(config_path.read_text())
+                    config = json.loads(config_path.read_text(encoding="utf-8"))
                 except json.JSONDecodeError:
                     config = None
             self._send_json(
@@ -726,7 +726,7 @@ class Handler(BaseHTTPRequestHandler):
             tokenizer_path = run_path / "tokenizer.json"
             if report_path.exists():
                 try:
-                    report = json.loads(report_path.read_text())
+                    report = json.loads(report_path.read_text(encoding="utf-8"))
                 except json.JSONDecodeError:
                     report = {}
                 output_path = report.get("output_path") if isinstance(report, dict) else None
@@ -738,7 +738,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": "tokenizer.json not found"}, status=404)
                 return
             try:
-                tokenizer_payload = json.loads(tokenizer_path.read_text())
+                tokenizer_payload = json.loads(tokenizer_path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 self._send_json({"error": "invalid tokenizer.json"}, status=400)
                 return
@@ -850,7 +850,7 @@ class Handler(BaseHTTPRequestHandler):
             if not target.exists():
                 self._send_json({"error": "config not found"}, status=404)
                 return
-            raw = target.read_text()
+            raw = target.read_text(encoding="utf-8")
             try:
                 parsed = json.loads(raw)
             except json.JSONDecodeError:
@@ -869,23 +869,23 @@ class Handler(BaseHTTPRequestHandler):
                 manifest = None
                 if manifest_path.exists():
                     try:
-                        manifest = json.loads(manifest_path.read_text())
+                        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                     except json.JSONDecodeError:
                         manifest = None
                     payload["manifest"] = manifest
                 logs_path = run_path / "logs.jsonl"
                 if logs_path.exists():
-                    payload["logs"] = logs_path.read_text().splitlines()[-200:]
+                    payload["logs"] = logs_path.read_text(encoding="utf-8", errors="replace").splitlines()[-200:]
                 proc_log = run_path / "process.log"
                 if proc_log.exists():
-                    payload["process_log"] = proc_log.read_text().splitlines()[-200:]
+                    payload["process_log"] = proc_log.read_text(encoding="utf-8", errors="replace").splitlines()[-200:]
                 payload["summary"] = build_run_summary(run_path, manifest)
                 self._send_json(payload)
                 return
             self._send_json({"error": "run not found"}, status=404)
             return
         if self.path in ("/", "/index.html"):
-            self._send_text(TEMPLATE_PATH.read_text())
+            self._send_text(TEMPLATE_PATH.read_text(encoding="utf-8"))
             return
         if self.path.startswith("/static/"):
             rel = unquote(self.path[len("/static/"):])
@@ -988,7 +988,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": f"invalid json: {exc}"}, status=400)
                     return
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(raw)
+                target.write_text(raw, encoding="utf-8")
                 self._send_json({"status": "saved", "name": name})
                 return
             if self.path == "/api/configs/delete":
@@ -1161,7 +1161,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": "run.json missing"}, status=404)
                     return
                 try:
-                    manifest = json.loads(manifest_path.read_text())
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                 except json.JSONDecodeError:
                     self._send_json({"error": "run.json invalid"}, status=400)
                     return

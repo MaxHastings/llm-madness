@@ -197,7 +197,7 @@ def run_train(
         if start_iter > max_iters:
             raise SystemExit("checkpoint iter exceeds max_iters")
 
-        text = data_path.read_text()
+        text = data_path.read_text(encoding="utf-8", errors="replace")
         split = split_text_by_lines(text, float(train_cfg.get("val_split", 0.0)))
 
         train_tokens = encode_text(tokenizer, split.train_text)
@@ -215,8 +215,12 @@ def run_train(
             else:
                 val_block_size = min(gpt_config.block_size, val_tokens.numel() - 1)
 
-        (run_dir / "tokenizer.json").write_text(tokenizer_path.read_text())
-        (run_dir / "training_config.json").write_text(json.dumps(config, indent=2, sort_keys=True))
+        tokenizer_text = tokenizer_path.read_text(encoding="utf-8", errors="replace")
+        (run_dir / "tokenizer.json").write_text(tokenizer_text, encoding="utf-8")
+        (run_dir / "training_config.json").write_text(
+            json.dumps(config, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
 
         if init_checkpoint_path is not None:
             train_cfg["init_checkpoint"] = str(init_checkpoint_path)

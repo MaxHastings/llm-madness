@@ -12,7 +12,7 @@ _TEMPLATE_RE = re.compile(r"\$\{([^}]+)\}")
 
 
 def load_json(path: Path | str) -> dict:
-    return json.loads(Path(path).read_text())
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def deep_merge(base: dict, override: dict) -> dict:

@@ -72,7 +72,7 @@ def validate_checkpoint(payload: dict, model_config: dict, tokenizer_path: Path 
             if ckpt_path != target_path:
                 ckpt_sha = payload.get("tokenizer_sha256")
                 try:
-                    target_sha = sha256_text(tokenizer_path.read_text())
+                    target_sha = sha256_text(tokenizer_path.read_text(encoding="utf-8"))
                 except OSError:
                     target_sha = None
                 if not (ckpt_sha and target_sha and ckpt_sha == target_sha):
@@ -94,7 +94,7 @@ def build_checkpoint_payload(
 ) -> dict[str, Any]:
     tokenizer_sha = None
     if tokenizer_path and tokenizer_path.exists():
-        tokenizer_sha = sha256_text(tokenizer_path.read_text())
+        tokenizer_sha = sha256_text(tokenizer_path.read_text(encoding="utf-8"))
     payload: dict[str, Any] = {
         "kind": CHECKPOINT_KIND,
         "version": CHECKPOINT_VERSION,

@@ -53,7 +53,8 @@ def expand_txt_paths(data_root: Path, selections: list[str]) -> list[Path]:
 def build_snapshot(paths: list[Path]) -> str:
     chunks: list[str] = []
     for path in paths:
-        text = path.read_text(errors="ignore")
+        # Force UTF-8 so the snapshot is always valid for tokenizers.
+        text = path.read_text(encoding="utf-8", errors="replace")
         if text and not text.endswith("\n"):
             text += "\n"
         chunks.append(text)
@@ -95,7 +96,7 @@ def create_dataset_manifest(
             total_bytes += int(stat.st_size)
 
         snapshot = build_snapshot(expanded)
-        snapshot_path.write_text(snapshot)
+        snapshot_path.write_text(snapshot, encoding="utf-8")
 
         payload = {
             "kind": "DatasetManifest",
@@ -125,7 +126,7 @@ def create_dataset_manifest(
 
 
 def load_dataset_manifest(path: Path) -> dict:
-    raw = json.loads(path.read_text())
+    raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or raw.get("kind") != "DatasetManifest":
         raise ValueError(f"not a DatasetManifest: {path}")
     return raw
