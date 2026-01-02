@@ -34,6 +34,17 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def sha256_file(path: Path | str, *, chunk_size: int = 1024 * 1024) -> str:
+    hasher = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        while True:
+            chunk = handle.read(chunk_size)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 def git_sha(root: Path | str) -> str | None:
     try:
         result = subprocess.run(

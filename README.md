@@ -28,6 +28,7 @@ A lightweight, end-to-end text LLM pipeline with a web UI for configs, datasets,
 - **Training infrastructure** (`llm_madness/stages/train.py`)
   - AdamW optimizer with learning rate warmup and cosine decay
   - Automatic device selection (CUDA/MPS/CPU)
+  - Token cache to avoid re-tokenizing large snapshots each run (`training.token_cache`)
   - Gradient clipping and dropout regularization
   - Checkpoint saving at intervals
   - Live sampling during training to monitor behavior
@@ -45,6 +46,9 @@ A lightweight, end-to-end text LLM pipeline with a web UI for configs, datasets,
   - SHA-256 hashing for reproducibility
   - Automatic train/validation splitting
   - Track dataset lineage and sources
+- **Token datasets** (`llm_madness/stages/tokenize_dataset.py`)
+  - Pre-tokenize snapshots into `runs/tokens/**/train.bin` + `val.bin` for fast training startup
+  - Memory-map token binaries during training to avoid holding full corpora in RAM
 
 ### **4. Web-Based Inspector UI**
 A **built-in Python web interface** for:
@@ -142,6 +146,7 @@ python -m scripts.web_ui --run-dir runs/train/latest
 
 # Or use CLI directly
 python -m scripts.train_tokenizer --config configs/tokenizer/default__v002.json
+python -m scripts.tokenize_dataset --config configs/tokenize_dataset/default__v001.json --dataset-manifest runs/datasets/latest/dataset_manifest.json
 python -m scripts.train_model --config configs/training/default__v001.json
 python -m scripts.pipeline --config configs/pipeline.json
 ```

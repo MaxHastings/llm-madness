@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import threading
+import time
 from pathlib import Path
 from typing import Iterable
 
@@ -30,6 +32,7 @@ def train_bpe_tokenizer(
     add_prefix_space: bool = False,
     byte_level: bool = True,
     split_digits: bool = False,
+    progress_heartbeat_seconds: int | None = 30,
 ) -> dict:
     input_path = Path(input_path)
     print(f"[tokenizer] loading input {input_path}", flush=True)
@@ -66,7 +69,21 @@ def train_bpe_tokenizer(
         special_tokens=special_tokens,
         show_progress=True,
     )
+    started = time.monotonic()
+    stop_event = threading.Event()
+
+    def heartbeat() -> None:
+        while not stop_event.wait(float(progress_heartbeat_seconds or 0)):
+            elapsed = int(time.monotonic() - started)
+            mins, secs = divmod(elapsed, 60)
+            print(f"[tokenizer] training... {mins}m {secs}s elapsed", flush=True)
+
+    hb_thread: threading.Thread | None = None
+    if progress_heartbeat_seconds and progress_heartbeat_seconds > 0:
+        hb_thread = threading.Thread(target=heartbeat, daemon=True)
+        hb_thread.start()
     tokenizer.train([str(input_path)], trainer)
+    stop_event.set()
     print("[tokenizer] training complete, saving tokenizer", flush=True)
     tokenizer.save(str(output_path))
     print(f"[tokenizer] saved {output_path}", flush=True)
@@ -79,4 +96,5 @@ def train_bpe_tokenizer(
         "discovered_tokens": discovered,
         "split_digits": split_digits,
         "output_path": str(output_path),
+        "progress_heartbeat_seconds": progress_heartbeat_seconds,
     }
