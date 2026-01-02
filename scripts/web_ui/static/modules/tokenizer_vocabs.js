@@ -1,5 +1,7 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
+import { isSectionActive, scheduleAutoRefresh } from './auto_refresh.js';
+import { emitEvent, onEvent } from './events.js';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -185,6 +187,7 @@ async function deleteVocab(runDir) {
     renderSelectedRun();
   }
   await loadVocabList();
+  emitEvent('tokenizer_vocabs:changed');
 }
 
 function renderSelectedRun() {
@@ -243,18 +246,27 @@ async function loadVocabTokens() {
   }
 }
 
-async function loadVocabList() {
+async function loadVocabList({ preserveSelection = false } = {}) {
+  const priorSelection = selectedRunDir;
   const data = await fetchJson('/api/tokenizer_vocabs');
   const items = data.vocabs || [];
   els.tokenizerVocabList.innerHTML = '';
-  setVocabDetails({ raw: '' }, '');
+  if (!preserveSelection) {
+    setVocabDetails({ raw: '' }, '');
+    selectedRunDir = null;
+  }
   if (!items.length) {
     const empty = document.createElement('div');
     empty.className = 'meta';
     empty.textContent = 'No vocabularies yet.';
     els.tokenizerVocabList.appendChild(empty);
+    if (preserveSelection && priorSelection) {
+      setVocabDetails({ raw: '' }, 'selected vocab no longer available');
+      selectedRunDir = null;
+    }
     return;
   }
+  let selectionStillExists = false;
   items.forEach((item) => {
     const row = document.createElement('div');
     row.className = 'artifact-card selectable-card vocab-card';
@@ -294,14 +306,27 @@ async function loadVocabList() {
     row.appendChild(runMeta);
     row.appendChild(actions);
     els.tokenizerVocabList.appendChild(row);
+    if (priorSelection && item.run_dir === priorSelection) {
+      selectionStillExists = true;
+    }
   });
+  if (preserveSelection) {
+    if (selectionStillExists) {
+      selectedRunDir = priorSelection;
+    } else if (priorSelection) {
+      setVocabDetails({ raw: '' }, 'selected vocab no longer available');
+      selectedRunDir = null;
+    }
+  }
   renderSelectedRun();
 }
 
 async function loadConfigs() {
+  const priorSelection = els.tokenizerVocabConfigSelect.value;
   const data = await api('/api/configs/meta', { scope: 'tokenizer' });
   const items = data.configs || [];
   els.tokenizerVocabConfigSelect.innerHTML = '';
+  const available = new Set();
   items.forEach((item) => {
     const opt = document.createElement('option');
     opt.value = item.path;
@@ -310,31 +335,39 @@ async function loadConfigs() {
     const vocab = item.vocab_size != null ? `vocab ${item.vocab_size}` : '';
     opt.textContent = [name, version, vocab].filter(Boolean).join(' • ');
     els.tokenizerVocabConfigSelect.appendChild(opt);
+    available.add(opt.value);
   });
   if (!items.length) {
     const opt = document.createElement('option');
     opt.value = '';
     opt.textContent = 'No tokenizer configs found';
     els.tokenizerVocabConfigSelect.appendChild(opt);
+  } else if (priorSelection && available.has(priorSelection)) {
+    els.tokenizerVocabConfigSelect.value = priorSelection;
   }
 }
 
 async function loadDatasets() {
+  const priorSelection = els.tokenizerVocabDatasetSelect.value;
   const data = await fetchJson('/api/datasets');
   const items = data.datasets || [];
   els.tokenizerVocabDatasetSelect.innerHTML = '';
+  const available = new Set();
   items.forEach((item) => {
     const opt = document.createElement('option');
     opt.value = item.manifest_path;
     const name = item.name ? `${item.name} (${item.id})` : item.id;
     opt.textContent = `${name} • files ${item.file_count ?? '-'}`;
     els.tokenizerVocabDatasetSelect.appendChild(opt);
+    available.add(opt.value);
   });
   if (!items.length) {
     const opt = document.createElement('option');
     opt.value = '';
     opt.textContent = 'No dataset manifests found';
     els.tokenizerVocabDatasetSelect.appendChild(opt);
+  } else if (priorSelection && available.has(priorSelection)) {
+    els.tokenizerVocabDatasetSelect.value = priorSelection;
   }
 }
 
@@ -363,6 +396,7 @@ async function createVocab() {
     els.tokenizerVocabMeta.textContent = res.error || 'run failed';
   }
   await loadVocabList();
+  emitEvent('tokenizer_vocabs:changed');
 }
 
 export function initTokenizerVocabs() {
@@ -391,4 +425,21 @@ export function initTokenizerVocabs() {
   loadConfigs();
   loadDatasets();
   setVocabTab('report');
+  onEvent('datasets:changed', loadDatasets);
+  onEvent('tokenizer_configs:changed', loadConfigs);
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('tokenizer-vocabs'),
+    task: () => loadVocabList({ preserveSelection: true }),
+  });
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('tokenizer-vocabs'),
+    task: loadConfigs,
+  });
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('tokenizer-vocabs'),
+    task: loadDatasets,
+  });
 }

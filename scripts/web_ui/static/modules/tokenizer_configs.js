@@ -1,5 +1,7 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
+import { isSectionActive, scheduleAutoRefresh } from './auto_refresh.js';
+import { emitEvent } from './events.js';
 
 let configs = [];
 let selectedPath = null;
@@ -273,6 +275,7 @@ async function saveNewVersion() {
   renderSummary(updated);
   await loadList();
   renderList();
+  emitEvent('tokenizer_configs:changed');
 }
 
 async function duplicateSelected() {
@@ -308,6 +311,7 @@ async function deleteConfig(path) {
     renderSummary(null);
   }
   await loadList();
+  emitEvent('tokenizer_configs:changed');
 }
 
 export function initTokenizerConfigs() {
@@ -342,4 +346,9 @@ export function initTokenizerConfigs() {
     }
   });
   setConfigTab('editor');
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('tokenizer-configs'),
+    task: loadList,
+  });
 }

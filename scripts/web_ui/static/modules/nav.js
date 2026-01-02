@@ -1,3 +1,5 @@
+import { emitEvent } from './events.js';
+
 export function initNav() {
   const navButtons = Array.from(document.querySelectorAll('.nav-btn'));
   const sections = Array.from(document.querySelectorAll('.page-section'));
@@ -9,6 +11,7 @@ export function initNav() {
     sections.forEach((section) => {
       section.classList.toggle('active', section.dataset.section === sectionName);
     });
+    emitEvent('section:changed', { section: sectionName });
   }
 
   navButtons.forEach((btn) => {

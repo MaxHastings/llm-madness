@@ -1,6 +1,8 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
 import { refreshRunList } from './runs.js';
+import { isSectionActive, scheduleAutoRefresh } from './auto_refresh.js';
+import { onEvent } from './events.js';
 
 function formatDatasetLabel(item) {
   if (!item) return '';
@@ -20,6 +22,7 @@ function formatTrainingSummary(item) {
 }
 
 export async function loadDatasets() {
+  const priorSelection = els.datasetSelect.value;
   const data = await fetchJson('/api/datasets');
   const items = data.datasets || [];
   els.datasetSelect.innerHTML = '';
@@ -27,12 +30,17 @@ export async function loadDatasets() {
   none.value = '';
   none.textContent = 'Select dataset';
   els.datasetSelect.appendChild(none);
+  const available = new Set();
   items.forEach((item) => {
     const opt = document.createElement('option');
     opt.value = item.manifest_path;
     opt.textContent = formatDatasetLabel(item);
     els.datasetSelect.appendChild(opt);
+    available.add(opt.value);
   });
+  if (priorSelection && available.has(priorSelection)) {
+    els.datasetSelect.value = priorSelection;
+  }
 }
 
 export function setDatasetSelection(path) {
@@ -48,6 +56,7 @@ export function setDatasetSelection(path) {
 }
 
 export async function loadTokenizerVocabs() {
+  const priorSelection = els.runTokenizerVocabSelect.value;
   const data = await fetchJson('/api/tokenizer_vocabs');
   const items = data.vocabs || [];
   els.runTokenizerVocabSelect.innerHTML = '';
@@ -55,6 +64,7 @@ export async function loadTokenizerVocabs() {
   none.value = '';
   none.textContent = 'Select tokenizer vocab';
   els.runTokenizerVocabSelect.appendChild(none);
+  const available = new Set();
   items.forEach((item) => {
     const opt = document.createElement('option');
     opt.value = item.tokenizer_path || '';
@@ -62,7 +72,13 @@ export async function loadTokenizerVocabs() {
     const vocab = item.vocab_size != null ? `vocab ${item.vocab_size}` : '';
     opt.textContent = [name, vocab].filter(Boolean).join(' • ');
     els.runTokenizerVocabSelect.appendChild(opt);
+    if (opt.value) {
+      available.add(opt.value);
+    }
   });
+  if (priorSelection && available.has(priorSelection)) {
+    els.runTokenizerVocabSelect.value = priorSelection;
+  }
 }
 
 export function setTokenizerVocabSelection(path) {
@@ -78,6 +94,7 @@ export function setTokenizerVocabSelection(path) {
 }
 
 export async function loadTrainingConfigs() {
+  const priorSelection = els.trainingConfigSelect.value;
   const data = await api('/api/configs/meta', { scope: 'training' });
   const items = data.configs || [];
   els.trainingConfigSelect.innerHTML = '';
@@ -85,6 +102,7 @@ export async function loadTrainingConfigs() {
   none.value = '';
   none.textContent = 'Select training config';
   els.trainingConfigSelect.appendChild(none);
+  const available = new Set();
   items.forEach((item) => {
     const opt = document.createElement('option');
     opt.value = item.path;
@@ -93,7 +111,11 @@ export async function loadTrainingConfigs() {
     const summary = formatTrainingSummary(item);
     opt.textContent = [name, version, summary].filter(Boolean).join(' • ');
     els.trainingConfigSelect.appendChild(opt);
+    available.add(opt.value);
   });
+  if (priorSelection && available.has(priorSelection)) {
+    els.trainingConfigSelect.value = priorSelection;
+  }
 }
 
 export function setTrainingConfigSelection(path) {
@@ -145,4 +167,22 @@ export function initRunSetup() {
   loadDatasets();
   loadTokenizerVocabs();
   loadTrainingConfigs();
+  onEvent('datasets:changed', loadDatasets);
+  onEvent('tokenizer_vocabs:changed', loadTokenizerVocabs);
+  onEvent('training_configs:changed', loadTrainingConfigs);
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('runs'),
+    task: loadDatasets,
+  });
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('runs'),
+    task: loadTokenizerVocabs,
+  });
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('runs'),
+    task: loadTrainingConfigs,
+  });
 }

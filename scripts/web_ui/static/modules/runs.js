@@ -1,6 +1,7 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
 import { renderLossChart } from './loss_chart.js';
+import { isSectionActive, scheduleAutoRefresh } from './auto_refresh.js';
 
 let runsCache = [];
 let selectedRun = null;
@@ -683,4 +684,14 @@ export function initRuns() {
   }
   refreshRunList();
   setInspectorTab('overview');
+  scheduleAutoRefresh({
+    intervalMs: 10000,
+    isEnabled: () => isSectionActive('runs'),
+    task: refreshRunList,
+  });
+  scheduleAutoRefresh({
+    intervalMs: 15000,
+    isEnabled: () => isSectionActive('runs') && currentInspectorTab === 'tokenizer',
+    task: refreshRunTokenizerReport,
+  });
 }

@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { els } from './dom.js';
 import { resetTokens } from './prompt.js';
+import { isSectionActive, scheduleAutoRefresh } from './auto_refresh.js';
 
 export async function refreshCheckpoints() {
   try {
@@ -37,6 +38,7 @@ export async function loadRunIntoInspector(item) {
 }
 
 async function refreshSessionRuns() {
+  const priorSelection = els.sessionRunSelect.value;
   const data = await api('/api/runs', { scope: 'all' });
   const runs = (data.runs || []).filter((run) => run.stage === 'train');
   runs.sort((a, b) => (a.start_time || '') < (b.start_time || '') ? 1 : -1);
@@ -45,6 +47,7 @@ async function refreshSessionRuns() {
     els.sessionRunMeta.textContent = 'no training runs found';
     return;
   }
+  let selectionStillExists = false;
   const baseName = (path) => {
     if (!path) return 'unknown';
     const parts = path.split('/');
@@ -56,7 +59,13 @@ async function refreshSessionRuns() {
     const label = run.run_id || baseName(run.run_dir) || 'unknown';
     opt.textContent = `${label} (${run.status || 'unknown'})`;
     els.sessionRunSelect.appendChild(opt);
+    if (priorSelection && priorSelection === run.run_dir) {
+      selectionStillExists = true;
+    }
   });
+  if (selectionStillExists) {
+    els.sessionRunSelect.value = priorSelection;
+  }
   els.sessionRunMeta.textContent = `${runs.length} training runs`;
 }
 
@@ -69,4 +78,14 @@ export function initSession() {
   });
   refreshCheckpoints();
   refreshSessionRuns();
+  scheduleAutoRefresh({
+    intervalMs: 15000,
+    isEnabled: () => isSectionActive('inspector'),
+    task: refreshCheckpoints,
+  });
+  scheduleAutoRefresh({
+    intervalMs: 15000,
+    isEnabled: () => isSectionActive('inspector'),
+    task: refreshSessionRuns,
+  });
 }

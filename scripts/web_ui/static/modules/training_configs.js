@@ -1,5 +1,7 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
+import { isSectionActive, scheduleAutoRefresh } from './auto_refresh.js';
+import { emitEvent } from './events.js';
 
 let configs = [];
 let selectedPath = null;
@@ -313,6 +315,7 @@ async function saveNewVersion() {
   renderSummary(updated);
   await loadList();
   renderList();
+  emitEvent('training_configs:changed');
 }
 
 async function duplicateSelected() {
@@ -348,6 +351,7 @@ async function deleteConfig(path) {
     renderSummary(null);
   }
   await loadList();
+  emitEvent('training_configs:changed');
 }
 
 export function initTrainingConfigs() {
@@ -382,4 +386,9 @@ export function initTrainingConfigs() {
     }
   });
   setConfigTab('editor');
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('training-configs'),
+    task: loadList,
+  });
 }

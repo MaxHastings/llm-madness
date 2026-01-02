@@ -1,5 +1,7 @@
 import { api, fetchJson } from './api.js';
 import { els } from './dom.js';
+import { isSectionActive, scheduleAutoRefresh } from './auto_refresh.js';
+import { emitEvent } from './events.js';
 
 let currentPath = '';
 const selections = new Set();
@@ -101,6 +103,7 @@ async function deleteManifest(runDir) {
   selectedManifestPath = null;
   renderSelectedManifest();
   await refreshDatasetManifests();
+  emitEvent('datasets:changed');
 }
 
 function renderEntries(entries, parent) {
@@ -255,6 +258,7 @@ async function createManifest() {
   selectionSizes.clear();
   renderSelections();
   await refreshDatasetManifests();
+  emitEvent('datasets:changed');
 }
 
 export function initDatasets() {
@@ -270,4 +274,14 @@ export function initDatasets() {
   loadPath(currentPath);
   refreshDatasetManifests();
   setPreviewTab('manifest');
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('datasets'),
+    task: () => loadPath(currentPath),
+  });
+  scheduleAutoRefresh({
+    intervalMs: 30000,
+    isEnabled: () => isSectionActive('datasets'),
+    task: refreshDatasetManifests,
+  });
 }
