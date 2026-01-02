@@ -14,7 +14,8 @@ export async function refreshCheckpoints() {
       if (ckpt === data.current) opt.selected = true;
       els.checkpointSelect.appendChild(opt);
     });
-    els.runMeta.textContent = data.run_dir;
+    const runLabel = data.run_name ? `${data.run_name} • ${data.run_dir}` : data.run_dir;
+    els.runMeta.textContent = runLabel;
     els.checkpointMeta.textContent = data.checkpoints.length ? '' : 'no checkpoints found';
   } catch (err) {
     els.checkpointSelect.innerHTML = '';
@@ -31,7 +32,11 @@ async function loadCheckpoint() {
 export async function loadRunIntoInspector(item) {
   if (!item) return;
   const data = await api('/api/load_run', { run_dir: item.run_dir });
-  els.runMeta.textContent = data.run_dir || els.runMeta.textContent;
+  if (data.run_name) {
+    els.runMeta.textContent = `${data.run_name} • ${data.run_dir || item.run_dir}`;
+  } else {
+    els.runMeta.textContent = data.run_dir || item.run_dir || els.runMeta.textContent;
+  }
   els.checkpointMeta.textContent = data.status || data.error || 'failed to load run';
   resetTokens();
   await refreshCheckpoints();
@@ -56,7 +61,7 @@ async function refreshSessionRuns() {
   runs.forEach((run) => {
     const opt = document.createElement('option');
     opt.value = run.run_dir;
-    const label = run.run_id || baseName(run.run_dir) || 'unknown';
+    const label = run.run_name ? `${run.run_name} • ${run.run_id || baseName(run.run_dir)}` : (run.run_id || baseName(run.run_dir) || 'unknown');
     opt.textContent = `${label} (${run.status || 'unknown'})`;
     els.sessionRunSelect.appendChild(opt);
     if (priorSelection && priorSelection === run.run_dir) {

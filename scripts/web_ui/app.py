@@ -1411,11 +1411,17 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/api/checkpoints":
                 checkpoints = STATE.list_checkpoints()
+                run_name = None
+                if STATE and STATE.run_config and isinstance(STATE.run_config.get("config"), dict):
+                    meta = STATE.run_config.get("config", {}).get("meta", {})
+                    if isinstance(meta, dict):
+                        run_name = meta.get("name") or None
                 self._send_json(
                     {
                         "checkpoints": checkpoints,
                         "current": STATE.current_checkpoint,
                         "run_dir": str(STATE.run_dir),
+                        "run_name": run_name,
                     }
                 )
                 return
@@ -1437,7 +1443,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": "invalid run dir"}, status=400)
                     return
                 STATE = ServerState(resolved, None, DEVICE_OVERRIDE)
-                self._send_json({"status": f"loaded {STATE.run_dir}", "run_dir": str(STATE.run_dir)})
+                run_name = None
+                if STATE and STATE.run_config and isinstance(STATE.run_config.get("config"), dict):
+                    meta = STATE.run_config.get("config", {}).get("meta", {})
+                    if isinstance(meta, dict):
+                        run_name = meta.get("name") or None
+                self._send_json({"status": f"loaded {STATE.run_dir}", "run_dir": str(STATE.run_dir), "run_name": run_name})
                 return
             if self.path == "/api/tokenizer_report":
                 payload = self._read_json()

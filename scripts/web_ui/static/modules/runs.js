@@ -507,7 +507,12 @@ async function showRunDetails(runDir) {
     logs: data.logs || [],
     process_log: data.process_log || [],
   };
-  els.runDetailMeta.textContent = selectedRun ? `${selectedRun.stage} | ${selectedRun.run_id}` : 'Run detail';
+  if (selectedRun) {
+    const label = selectedRun.run_name ? `${selectedRun.run_name} • ${selectedRun.run_id}` : selectedRun.run_id;
+    els.runDetailMeta.textContent = `${selectedRun.stage} | ${label}`;
+  } else {
+    els.runDetailMeta.textContent = 'Run detail';
+  }
   if (selectedRun && selectedRun.has_checkpoints === false) {
     els.runLoadStatus.textContent = 'No checkpoints yet for this run.';
   } else {
