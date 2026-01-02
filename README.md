@@ -6,6 +6,8 @@ A lightweight, end-to-end text LLM pipeline with a web UI for configs, datasets,
 
 <img width="1728" height="992" alt="Screenshot 2026-01-01 at 9 07 16 PM" src="https://github.com/user-attachments/assets/eea08ced-4e53-409e-bfab-5e17b33d2922" />
 
+<img width="1728" height="995" alt="Screenshot 2026-01-01 at 9 09 05 PM" src="https://github.com/user-attachments/assets/3fb88dce-4b4f-47e1-99ec-47fc692345cb" />
+
 ## What it does
 
 - Tokenizer: configure BPE settings and build vocabularies from dataset snapshots.
