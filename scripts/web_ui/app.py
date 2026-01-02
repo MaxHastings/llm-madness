@@ -1334,7 +1334,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/decode":
                 payload = self._read_json()
                 ids = payload.get("ids", [])
-                text = STATE.tokenizer.decode(ids)
+                text = STATE.tokenizer.decode(ids, skip_special_tokens=False)
                 self._send_json({"text": text})
                 return
             if self.path == "/api/ids_to_tokens":

@@ -244,7 +244,7 @@ function renderRunRow(item) {
     actions.appendChild(stopBtn);
   }
 
-  if (!item.is_active && item.status === 'stopped' && item.has_checkpoints) {
+  if (!item.is_active && item.has_checkpoints && ['stopped', 'failed'].includes(item.status)) {
     const resumeBtn = document.createElement('button');
     resumeBtn.textContent = 'Resume';
     resumeBtn.addEventListener('click', async (event) => {
