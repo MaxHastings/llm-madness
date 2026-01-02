@@ -19,13 +19,13 @@ A lightweight, end-to-end text LLM pipeline with a web UI for configs, datasets,
 ## Core concepts
 
 ### **1. Custom LLM Training Pipeline**
-- **GPT-style transformer implementation** (`model. py`)
+- **GPT-style transformer implementation** (`llm_madness/model.py`)
   - Causal self-attention with multi-head architecture
   - Configurable model dimensions (layers, heads, embedding size, block size)
   - Built-in generation with temperature and top-k sampling
   - Forward passes with attention trace and hidden state inspection
   
-- **Training infrastructure** (`stages/train.py`)
+- **Training infrastructure** (`llm_madness/stages/train.py`)
   - AdamW optimizer with learning rate warmup and cosine decay
   - Automatic device selection (CUDA/MPS/CPU)
   - Gradient clipping and dropout regularization
@@ -33,21 +33,21 @@ A lightweight, end-to-end text LLM pipeline with a web UI for configs, datasets,
   - Live sampling during training to monitor behavior
 
 ### **2. Tokenizer Experimentation**
-- **BPE tokenizer training** (`tokenizer.py`)
+- **BPE tokenizer training** (`llm_madness/tokenizer.py`)
   - Byte-level tokenization with customizable vocabulary sizes
   - Special token discovery via regex patterns
   - Configurable pre-tokenization (digit splitting, prefix spaces)
   - Vocabulary versioning and manifest tracking
 
 ### **3. Dataset Management**
-- **Dataset manifests** (`datasets/manifest.py`)
+- **Dataset manifests** (`llm_madness/datasets/manifest.py`)
   - Combine multiple text files into versioned snapshots
   - SHA-256 hashing for reproducibility
   - Automatic train/validation splitting
   - Track dataset lineage and sources
 
 ### **4. Web-Based Inspector UI**
-A **comprehensive Flask-based web interface** for:
+A **built-in Python web interface** for:
 - **Tokenizer Config Management**: Create, version, and compare tokenizer configurations
 - **Training Config Management**: Design model architectures and training hyperparameters
 - **Dataset Browser**: View and organize training datasets
@@ -65,7 +65,7 @@ A **comprehensive Flask-based web interface** for:
   - Complete provenance tracking from data → tokenizer → model
 
 ### **6. Pipeline Orchestration**
-- **End-to-end pipeline** (`stages/pipeline.py`)
+- **End-to-end pipeline** (`llm_madness/stages/pipeline.py`)
   - Chain tokenizer training → model training
   - Automatic resolution of "latest" runs
   - Configurable stage enabling/disabling
@@ -132,15 +132,18 @@ A **comprehensive Flask-based web interface** for:
 ### **Quick Start**
 ```bash
 # Install dependencies
-pip install -r requirements. txt  # Only requires 'tokenizers'
+pip install -r requirements.txt
 
-# Launch web UI
-python -m scripts. web_ui
+# Run an end-to-end pipeline (data → tokenizer → train)
+python -m scripts.pipeline --config configs/pipeline.json
+
+# Launch web UI (inspect the latest training run)
+python -m scripts.web_ui --run-dir runs/train/latest
 
 # Or use CLI directly
-python scripts/train_tokenizer.py --config configs/tokenizer/default__v002.json
-python scripts/train_model.py --config configs/training/default__v001.json
-python scripts/pipeline.py --config configs/pipeline. json
+python -m scripts.train_tokenizer --config configs/tokenizer/default__v002.json
+python -m scripts.train_model --config configs/training/default__v001.json
+python -m scripts.pipeline --config configs/pipeline.json
 ```
 
 ### **Example Workflow**
@@ -159,3 +162,8 @@ python scripts/pipeline.py --config configs/pipeline. json
 - Domain-specific tokenizer research  
 - Debugging model behavior with transparency  
 - Local experimentation without heavy infrastructure
+
+## **Non-goals**
+- Not a hosted experiment tracker (no accounts, remote backend, or team features)
+- Not designed for large-scale or distributed training
+- Not a general-purpose ML framework (focused on tiny, reproducible text GPT experiments)
