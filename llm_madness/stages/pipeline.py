@@ -6,6 +6,7 @@ from pathlib import Path
 from llm_madness.config import load_config
 from llm_madness.runs import finish_manifest, start_manifest
 from llm_madness.stages.tokenizer import run_tokenizer
+from llm_madness.stages.tokenize_dataset import run_tokenize_dataset
 from llm_madness.stages.train import run_train
 from llm_madness.utils import ensure_dir, find_latest_run, timestamp
 
@@ -39,10 +40,12 @@ def run_pipeline(config: dict, repo_root: Path) -> dict:
 
     try:
         tokenizer_cfg = config.get("tokenizer", {})
+        tokenize_cfg = config.get("tokenize_dataset", {})
         train_cfg = config.get("train", {})
 
         tokenizer_path = None
         tokenizer_input = None
+        tokens_dir = None
 
         if tokenizer_cfg.get("enabled", True):
             tokenizer_config_path = tokenizer_cfg.get("config", "configs/tokenizer/default__v001.json")
@@ -64,6 +67,32 @@ def run_pipeline(config: dict, repo_root: Path) -> dict:
             outputs["tokenizer"] = str(result["run_dir"])
             _log_event(log_path, {"stage": "tokenizer", "status": "complete", "run_dir": str(result["run_dir"])})
 
+        if tokenize_cfg.get("enabled", True):
+            tokenize_config_path = tokenize_cfg.get("config", "configs/tokenize_dataset/default__v001.json")
+            tokenize_config = load_config(Path(tokenize_config_path))
+            snapshot_path = tokenize_cfg.get("snapshot")
+            if snapshot_path is None and train_cfg.get("data") is not None:
+                snapshot_path = str(train_cfg.get("data"))
+            if snapshot_path is None and tokenizer_input is not None:
+                snapshot_path = str(tokenizer_input)
+            if snapshot_path is None:
+                raise SystemExit("pipeline tokenization snapshot missing; set tokenize_dataset.snapshot or train.data or tokenizer.input")
+            if tokenizer_path is None:
+                raise SystemExit("pipeline tokenization requires tokenizer; enable tokenizer stage or set train.tokenizer")
+            output_dir = Path(tokenize_cfg.get("output_dir", "runs/tokens"))
+            _log_event(log_path, {"stage": "tokenize_dataset", "status": "running"})
+            result = run_tokenize_dataset(
+                tokenize_config,
+                _resolve_latest(Path(snapshot_path)),
+                _resolve_latest(Path(str(tokenizer_path))),
+                output_dir,
+                repo_root,
+                dataset_manifest=None,
+            )
+            tokens_dir = result["run_dir"]
+            outputs["tokens"] = str(tokens_dir)
+            _log_event(log_path, {"stage": "tokenize_dataset", "status": "complete", "run_dir": str(tokens_dir)})
+
         if train_cfg.get("enabled", True):
             training_config_path = train_cfg.get("config", "configs/training/default__v001.json")
             training_config = load_config(Path(training_config_path))
@@ -73,7 +102,9 @@ def run_pipeline(config: dict, repo_root: Path) -> dict:
                 tokenizer_path_cfg = str(tokenizer_path)
             if tokenizer_path_cfg is None:
                 raise SystemExit("pipeline tokenizer missing; set train.tokenizer or run tokenizer stage")
-            if data_path is None and tokenizer_input is not None:
+            if data_path is None and tokens_dir is not None:
+                data_path = str(tokens_dir)
+            elif data_path is None and tokenizer_input is not None:
                 data_path = str(tokenizer_input)
             if data_path is None:
                 raise SystemExit("pipeline training data missing; set train.data in configs/pipeline.json")

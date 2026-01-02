@@ -3,16 +3,18 @@ from __future__ import annotations
 import json
 import math
 import random
+import time
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from llm_madness.checkpoints import build_checkpoint_payload, is_checkpoint_v2, load_checkpoint, validate_checkpoint
-from llm_madness.data import encode_text, get_batch, split_text_by_lines
+from llm_madness.data import encode_text, get_batch, get_batch_memmap, load_token_dataset, split_text_by_lines
 from llm_madness.model import GPT, GPTConfig
 from llm_madness.runs import finish_manifest, start_manifest
 from llm_madness.tokenizer import load_tokenizer
-from llm_madness.utils import ensure_dir, find_latest_run, timestamp
+from llm_madness.utils import ensure_dir, find_latest_run, sha256_file, timestamp
 
 
 def select_device(name: str) -> torch.device:
@@ -27,7 +29,7 @@ def select_device(name: str) -> torch.device:
 
 def estimate_loss(
     model: GPT,
-    tokens: torch.Tensor,
+    tokens: torch.Tensor | np.memmap,
     block_size: int,
     batch_size: int,
     eval_iters: int,
@@ -37,7 +39,10 @@ def estimate_loss(
     losses = []
     with torch.no_grad():
         for _ in range(eval_iters):
-            xb, yb = get_batch(tokens, block_size, batch_size, device)
+            if isinstance(tokens, torch.Tensor):
+                xb, yb = get_batch(tokens, block_size, batch_size, device)
+            else:
+                xb, yb = get_batch_memmap(tokens, block_size, batch_size, device)
             _, loss = model(xb, yb)
             losses.append(loss.item())
     model.train()
@@ -197,23 +202,113 @@ def run_train(
         if start_iter > max_iters:
             raise SystemExit("checkpoint iter exceeds max_iters")
 
-        text = data_path.read_text()
-        split = split_text_by_lines(text, float(train_cfg.get("val_split", 0.0)))
+        val_split = float(train_cfg.get("val_split", 0.0))
 
-        train_tokens = encode_text(tokenizer, split.train_text)
-        val_tokens = encode_text(tokenizer, split.val_text) if split.val_text else None
+        train_tokens: torch.Tensor | np.memmap
+        val_tokens: torch.Tensor | np.memmap | None
 
-        if train_tokens.numel() < 2:
+        if data_path.is_dir() and (data_path / "meta.json").exists():
+            ds = load_token_dataset(str(data_path), mode="r")
+            if ds.vocab_size and ds.vocab_size != tokenizer.get_vocab_size():
+                raise SystemExit("token dataset vocab_size does not match tokenizer vocab_size")
+            train_tokens = ds.train
+            val_tokens = ds.val
+            print(
+                f"[train] using token dataset {data_path} (train={ds.train.size} tokens, val={ds.val.size if ds.val is not None else 0} tokens)",
+                flush=True,
+            )
+        else:
+            cache_cfg = train_cfg.get("token_cache", {})
+            cache_enabled = bool(cache_cfg.get("enabled", True))
+            cache_use_content_hash = bool(cache_cfg.get("use_content_hash", False))
+            cache_dir = Path(cache_cfg.get("dir", "runs/cache/tokens"))
+            cache_dir = ensure_dir(cache_dir) if cache_enabled else cache_dir
+
+            tok_hash: str | None = None
+            data_hash: str | None = None
+            if cache_enabled:
+                t0 = time.perf_counter()
+                if cache_use_content_hash:
+                    tok_hash = sha256_file(tokenizer_path)
+                    data_hash = sha256_file(data_path)
+                else:
+                    tok_stat = tokenizer_path.stat()
+                    data_stat = data_path.stat()
+                    tok_hash = f"stat:{tok_stat.st_size}:{int(tok_stat.st_mtime)}"
+                    data_hash = f"stat:{data_stat.st_size}:{int(data_stat.st_mtime)}"
+                print(f"[train] computed cache keys in {time.perf_counter() - t0:.2f}s", flush=True)
+
+            def _cache_key() -> str:
+                assert tok_hash is not None
+                assert data_hash is not None
+                val_tag = f"{val_split:.6f}".replace(".", "p")
+                return f"v1__tok_{tok_hash[:16]}__data_{data_hash[:16]}__val_{val_tag}"
+
+            train_tokens_path: Path | None = None
+            val_tokens_path: Path | None = None
+            meta_path: Path | None = None
+            if cache_enabled:
+                key = _cache_key()
+                train_tokens_path = cache_dir / f"{key}__train.pt"
+                val_tokens_path = cache_dir / f"{key}__val.pt"
+                meta_path = cache_dir / f"{key}.json"
+
+            if (
+                cache_enabled
+                and train_tokens_path is not None
+                and val_tokens_path is not None
+                and train_tokens_path.exists()
+                and (val_split <= 0.0 or val_tokens_path.exists())
+            ):
+                t0 = time.perf_counter()
+                train_tokens = torch.load(train_tokens_path, map_location="cpu")
+                if val_split > 0.0:
+                    cached_val = torch.load(val_tokens_path, map_location="cpu")
+                    val_tokens = None if cached_val.numel() == 0 else cached_val
+                else:
+                    val_tokens = None
+                print(f"[train] loaded cached tokens in {time.perf_counter() - t0:.2f}s", flush=True)
+            else:
+                t0 = time.perf_counter()
+                text = data_path.read_text()
+                split = split_text_by_lines(text, val_split)
+                train_tokens = encode_text(tokenizer, split.train_text)
+                val_tokens = encode_text(tokenizer, split.val_text) if split.val_text else None
+                print(f"[train] tokenized dataset in {time.perf_counter() - t0:.2f}s", flush=True)
+
+                if cache_enabled and train_tokens_path is not None and val_tokens_path is not None and meta_path is not None:
+                    t1 = time.perf_counter()
+                    torch.save(train_tokens, train_tokens_path)
+                    torch.save(val_tokens if val_tokens is not None else torch.empty(0, dtype=torch.long), val_tokens_path)
+                    meta = {
+                        "kind": "TokenCache",
+                        "version": 1,
+                        "data_path": str(data_path),
+                        "data_fingerprint": data_hash,
+                        "tokenizer_path": str(tokenizer_path),
+                        "tokenizer_fingerprint": tok_hash,
+                        "val_split": val_split,
+                        "use_content_hash": cache_use_content_hash,
+                        "train_tokens": str(train_tokens_path),
+                        "val_tokens": str(val_tokens_path),
+                        "val_tokens_empty": val_tokens is None,
+                    }
+                    (meta_path).write_text(json.dumps(meta, indent=2, sort_keys=True))
+                    print(f"[train] wrote token cache in {time.perf_counter() - t1:.2f}s", flush=True)
+
+        train_len = int(train_tokens.numel()) if isinstance(train_tokens, torch.Tensor) else int(train_tokens.size)
+        if train_len < 2:
             raise SystemExit("training data is too small; need at least 2 tokens")
-        train_block_size = min(gpt_config.block_size, train_tokens.numel() - 1)
+        train_block_size = min(gpt_config.block_size, train_len - 1)
 
         val_block_size: int | None = None
         if val_tokens is not None:
-            if val_tokens.numel() < 2:
+            val_len = int(val_tokens.numel()) if isinstance(val_tokens, torch.Tensor) else int(val_tokens.size)
+            if val_len < 2:
                 print("warning: validation split too small; skipping validation")
                 val_tokens = None
             else:
-                val_block_size = min(gpt_config.block_size, val_tokens.numel() - 1)
+                val_block_size = min(gpt_config.block_size, val_len - 1)
 
         (run_dir / "tokenizer.json").write_text(tokenizer_path.read_text())
         (run_dir / "training_config.json").write_text(json.dumps(config, indent=2, sort_keys=True))
@@ -229,7 +324,10 @@ def run_train(
             for param_group in optimizer.param_groups:
                 param_group["lr"] = lr
 
-            xb, yb = get_batch(train_tokens, train_block_size, batch_size, device)
+            if isinstance(train_tokens, torch.Tensor):
+                xb, yb = get_batch(train_tokens, train_block_size, batch_size, device)
+            else:
+                xb, yb = get_batch_memmap(train_tokens, train_block_size, batch_size, device)
             _, loss = model(xb, yb)
             optimizer.zero_grad(set_to_none=True)
             loss.backward()

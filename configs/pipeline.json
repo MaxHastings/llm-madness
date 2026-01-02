@@ -7,6 +7,12 @@
     "input": null,
     "output_dir": "runs/tokenizer"
   },
+  "tokenize_dataset": {
+    "enabled": true,
+    "config": "configs/tokenize_dataset/default__v001.json",
+    "snapshot": null,
+    "output_dir": "runs/tokens"
+  },
   "train": {
     "enabled": true,
     "config": "configs/training/default__v001.json",

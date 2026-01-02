@@ -42,6 +42,11 @@ def run_tokenizer(
             add_prefix_space=bool(config.get("add_prefix_space", False)),
             byte_level=bool(config.get("byte_level", True)),
             split_digits=bool(config.get("split_digits", False)),
+            progress_heartbeat_seconds=(
+                int(config["progress_heartbeat_seconds"])
+                if config.get("progress_heartbeat_seconds") is not None
+                else None
+            ),
         )
         print("[tokenizer] writing report", flush=True)
         write_json(config_path, config)
