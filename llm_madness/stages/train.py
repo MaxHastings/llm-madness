@@ -12,7 +12,7 @@ from llm_madness.data import encode_text, get_batch, split_text_by_lines
 from llm_madness.model import GPT, GPTConfig
 from llm_madness.runs import finish_manifest, start_manifest
 from llm_madness.tokenizer import load_tokenizer
-from llm_madness.utils import ensure_dir, find_latest_run, sha256_text, timestamp
+from llm_madness.utils import ensure_dir, find_latest_run, timestamp
 
 
 def select_device(name: str) -> torch.device:
@@ -215,7 +215,6 @@ def run_train(
             else:
                 val_block_size = min(gpt_config.block_size, val_tokens.numel() - 1)
 
-        data_sha = sha256_text(text)
         (run_dir / "tokenizer.json").write_text(tokenizer_path.read_text())
         (run_dir / "training_config.json").write_text(json.dumps(config, indent=2, sort_keys=True))
 

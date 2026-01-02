@@ -89,7 +89,6 @@ export const els = {
   runOverrideEvalInterval: byId('runOverrideEvalInterval'),
   runOverrideSeed: byId('runOverrideSeed'),
   runOverrideDevice: byId('runOverrideDevice'),
-  runOverrideMeta: byId('runOverrideMeta'),
 
   tokenizerConfigList: byId('tokenizerConfigList'),
   tokenizerConfigEditor: byId('tokenizerConfigEditor'),
