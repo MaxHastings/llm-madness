@@ -1118,6 +1118,8 @@ class Handler(BaseHTTPRequestHandler):
                         self._send_json({"error": "tokenizer vocab required for training run"}, status=400)
                         return
                     cmd += ["scripts.train_model", "--config", str(config_path), "--set", f"run.id={run_id}"]
+                    if run_name:
+                        cmd += ["--set", f"meta.name={run_name}"]
                     if isinstance(overrides, dict):
                         for key, value in overrides.items():
                             if value is None:
