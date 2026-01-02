@@ -20,6 +20,24 @@ function formatBytes(bytes) {
   return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
 }
 
+function estimateTokens(bytes) {
+  if (bytes == null) return null;
+  return Math.max(0, Math.round(bytes / 4));
+}
+
+function formatTokens(tokens) {
+  if (tokens == null) return '-';
+  const units = ['', 'K', 'M', 'B'];
+  let value = tokens;
+  let idx = 0;
+  while (value >= 1000 && idx < units.length - 1) {
+    value /= 1000;
+    idx += 1;
+  }
+  const precision = idx === 0 ? 0 : 1;
+  return `${value.toFixed(precision)}${units[idx]} tokens`;
+}
+
 function renderSelections() {
   const items = Array.from(selections).sort();
   els.datasetSelections.value = items.join('\n');
@@ -37,7 +55,12 @@ function renderSelections() {
     total += selectionSizes.get(path);
   });
   const sizeLabel = unknown ? 'size unknown' : `${formatBytes(total)} total`;
-  els.datasetMeta.textContent = `${items.length} selection(s) | ${sizeLabel}`;
+  const tokensLabel = unknown ? null : `~${formatTokens(estimateTokens(total))}`;
+  const metaParts = [`${items.length} selection(s)`, sizeLabel];
+  if (tokensLabel) {
+    metaParts.push(tokensLabel);
+  }
+  els.datasetMeta.textContent = metaParts.join(' | ');
 }
 
 function setManifestPreview(payload, label) {
@@ -64,7 +87,9 @@ function renderManifestFiles(files) {
     name.textContent = file.path || '-';
     const size = document.createElement('span');
     size.className = 'file-size';
-    size.textContent = formatBytes(file.size_bytes);
+    const tokenEstimate = estimateTokens(file.size_bytes);
+    const tokenLabel = tokenEstimate == null ? '-' : `~${formatTokens(tokenEstimate)}`;
+    size.textContent = `${formatBytes(file.size_bytes)} | ${tokenLabel}`;
     row.appendChild(name);
     row.appendChild(size);
     els.datasetManifestFiles.appendChild(row);
@@ -153,7 +178,9 @@ function renderEntries(entries, parent) {
     const meta = document.createElement('span');
     meta.className = 'file-meta';
     if (entry.size_bytes != null) {
-      meta.textContent = formatBytes(entry.size_bytes);
+      const tokenEstimate = estimateTokens(entry.size_bytes);
+      const tokenLabel = tokenEstimate == null ? '-' : `~${formatTokens(tokenEstimate)}`;
+      meta.textContent = `${formatBytes(entry.size_bytes)} | ${tokenLabel}`;
     } else if (entry.type === 'dir') {
       meta.textContent = 'folder';
     } else {
@@ -211,7 +238,9 @@ async function refreshDatasetManifests() {
     title.textContent = item.name ? `${item.name} (${item.id})` : item.id;
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.textContent = `files ${item.file_count ?? '-'} | size ${formatBytes(item.total_bytes)} | ${item.created_at ?? ''}`;
+    const tokenEstimate = estimateTokens(item.total_bytes);
+    const tokenLabel = tokenEstimate == null ? '-' : `~${formatTokens(tokenEstimate)}`;
+    meta.textContent = `files ${item.file_count ?? '-'} | size ${formatBytes(item.total_bytes)} | ${tokenLabel} | ${item.created_at ?? ''}`;
     const path = document.createElement('div');
     path.className = 'meta';
     path.textContent = item.manifest_path;
