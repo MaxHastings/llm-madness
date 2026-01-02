@@ -211,6 +211,21 @@ def finalize_run_manifest(run_dir: Path, manifest: dict, exit_code: int) -> dict
     return payload
 
 
+def finalize_stale_manifest(run_dir: Path, manifest: dict) -> dict:
+    status = normalize_status(manifest.get("status"))
+    if status != "running" or manifest.get("end_time"):
+        return manifest
+    if not (run_dir / "process.log").exists():
+        return manifest
+    payload = dict(manifest)
+    payload["status"] = "failed"
+    payload["end_time"] = datetime.now().isoformat(timespec="seconds")
+    if not payload.get("error"):
+        payload["error"] = "stale run (no active process)"
+    write_json(run_dir / "run.json", payload)
+    return payload
+
+
 def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
     run_id = run_dir.name
     manifest_path = run_dir / "run.json"
@@ -226,6 +241,8 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
     is_active, exit_code = check_run_process(run_id)
     if manifest and exit_code is not None:
         manifest = finalize_run_manifest(run_dir, manifest, exit_code)
+    if manifest and not is_active:
+        manifest = finalize_stale_manifest(run_dir, manifest)
     status = normalize_status(manifest.get("status") if manifest else None)
     if is_active:
         status = "running"
