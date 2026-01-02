@@ -8,9 +8,11 @@
 
 # tokenizer configs (user-specific)
 /configs/tokenizer/**
+!/configs/tokenizer/default__v002.json
 
 # training configs (user-specific)
 /configs/training/**
+!/configs/training/default__v001.json
 
 # user-owned scripts (keep folder, ignore contents)
 /user_scripts/**
