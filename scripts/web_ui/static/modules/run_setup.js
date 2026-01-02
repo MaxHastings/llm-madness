@@ -67,10 +67,13 @@ export async function loadTokenizerVocabs() {
   const available = new Set();
   items.forEach((item) => {
     const opt = document.createElement('option');
-    opt.value = item.tokenizer_path || '';
+    const exists = Boolean(item.tokenizer_exists);
+    opt.value = exists ? item.tokenizer_path || '' : '';
+    opt.disabled = !exists;
     const name = item.name ? `${item.name} v${item.version ?? '-'}` : item.run_id;
     const vocab = item.vocab_size != null ? `vocab ${item.vocab_size}` : '';
-    opt.textContent = [name, vocab].filter(Boolean).join(' • ');
+    const status = item.status && item.status !== 'completed' ? item.status : '';
+    opt.textContent = [name, vocab, status].filter(Boolean).join(' • ');
     els.runTokenizerVocabSelect.appendChild(opt);
     if (opt.value) {
       available.add(opt.value);

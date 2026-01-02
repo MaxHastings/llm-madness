@@ -591,6 +591,17 @@ class Handler(BaseHTTPRequestHandler):
                         manifest = json.loads(manifest_path.read_text())
                     except json.JSONDecodeError:
                         continue
+                    if not isinstance(manifest, dict):
+                        continue
+                    run_id = run_dir.name
+                    is_active, exit_code = check_run_process(run_id)
+                    if exit_code is not None:
+                        manifest = finalize_run_manifest(run_dir, manifest, exit_code)
+                    if not is_active:
+                        manifest = finalize_stale_manifest(run_dir, manifest)
+                    status = normalize_status(manifest.get("status"))
+                    if is_active:
+                        status = "running"
                     report_path = run_dir / "report.json"
                     report = {}
                     if report_path.exists():
@@ -598,7 +609,7 @@ class Handler(BaseHTTPRequestHandler):
                             report = json.loads(report_path.read_text())
                         except json.JSONDecodeError:
                             report = {}
-                    config = manifest.get("config", {}) if isinstance(manifest, dict) else {}
+                    config = manifest.get("config", {})
                     meta = config.get("meta", {}) if isinstance(config, dict) else {}
                     input_path = report.get("input_path") or manifest.get("inputs", {}).get("input")
                     dataset_manifest = manifest.get("inputs", {}).get("dataset_manifest")
@@ -619,11 +630,13 @@ class Handler(BaseHTTPRequestHandler):
                             input_bytes = Path(input_path).stat().st_size
                         except FileNotFoundError:
                             input_bytes = None
+                    tokenizer_path = report.get("output_path") or str(run_dir / "tokenizer.json")
+                    tokenizer_exists = Path(tokenizer_path).resolve().exists()
                     vocabs.append(
                         {
                             "run_id": run_dir.name,
                             "run_dir": str(run_dir),
-                            "status": manifest.get("status"),
+                            "status": status,
                             "created_at": manifest.get("start_time"),
                             "name": meta.get("name"),
                             "version": meta.get("version"),
@@ -635,7 +648,8 @@ class Handler(BaseHTTPRequestHandler):
                             "dataset_name": dataset_name,
                             "dataset_id": dataset_id,
                             "input_bytes": input_bytes,
-                            "tokenizer_path": report.get("output_path") or str(run_dir / "tokenizer.json"),
+                            "tokenizer_path": tokenizer_path,
+                            "tokenizer_exists": tokenizer_exists,
                         }
                     )
             self._send_json({"vocabs": vocabs})
