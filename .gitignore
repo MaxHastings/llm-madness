@@ -9,6 +9,9 @@
 # tokenizer configs (user-specific)
 /configs/tokenizer/**
 
+# training configs (user-specific)
+/configs/training/**
+
 # user-owned scripts (keep folder, ignore contents)
 /user_scripts/**
 !/user_scripts/.gitkeep
