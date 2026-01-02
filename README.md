@@ -76,25 +76,25 @@ A **comprehensive Flask-based web interface** for:
 ## **Practical Use Cases for AI Engineers**
 
 ### **Research & Experimentation**
-1. **Architecture search**:  Quickly iterate on model dimensions (layers, heads, embedding sizes)
-2. **Tokenizer optimization**: Test different vocabulary sizes and special token strategies
-3. **Training dynamics**: Study loss curves, convergence patterns, and learning rate schedules
-4. **Ablation studies**: Version configs to compare different hyperparameters
+- **Architecture search**:  Quickly iterate on model dimensions (layers, heads, embedding sizes)
+- **Tokenizer optimization**: Test different vocabulary sizes and special token strategies
+- **Training dynamics**: Study loss curves, convergence patterns, and learning rate schedules
+- **Ablation studies**: Version configs to compare different hyperparameters
 
 ### **Educational & Learning**
-1. **Understand transformer internals**: Clean, readable implementation of GPT architecture
-2. **Debug attention patterns**: Visualize attention maps per layer and head
-3. **Token prediction analysis**: See what the model "thinks" at each position
+- **Understand transformer internals**: Clean, readable implementation of GPT architecture
+- **Debug attention patterns**: Visualize attention maps per layer and head
+- **Token prediction analysis**: See what the model "thinks" at each position
 
 ### **Custom Domain Applications**
-1. **Domain-specific tokenization**: Train BPE on specialized corpora (code, math, medical texts)
-2. **Small model deployment**: Train tiny models for edge devices or specific tasks
-3. **Data exploration**: Use the dataset tools to analyze text statistics
+- **Domain-specific tokenization**: Train BPE on specialized corpora (code, math, medical texts)
+- **Small model deployment**: Train tiny models for edge devices or specific tasks
+- **Data exploration**: Use the dataset tools to analyze text statistics
 
 ### **Prototyping & Validation**
-1. **Proof-of-concept models**:  Quickly train small models to validate ideas
-2. **Synthetic data experiments**: Test with custom-generated datasets
-3. **Baseline establishment**: Create reference models for comparison
+- **Proof-of-concept models**:  Quickly train small models to validate ideas
+- **Synthetic data experiments**: Test with custom-generated datasets
+- **Baseline establishment**: Create reference models for comparison
 
 ---
 
