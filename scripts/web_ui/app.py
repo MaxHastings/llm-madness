@@ -20,7 +20,7 @@ import torch
 
 from llm_madness.datasets.manifest import create_dataset_manifest
 from llm_madness.tokenizer import load_tokenizer
-from llm_madness.utils import find_latest_run, timestamp
+from llm_madness.utils import find_latest_run, timestamp, write_json
 
 from .state import ServerState
 
@@ -186,11 +186,29 @@ def infer_stage(run_dir: Path, manifest: dict | None) -> str:
     return stage or "unknown"
 
 
-def run_is_active(run_id: str) -> bool:
+def check_run_process(run_id: str) -> tuple[bool, int | None]:
     info = RUN_PROCS.get(run_id)
     if not info:
-        return False
-    return info["process"].poll() is None
+        return False, None
+    proc = info["process"]
+    exit_code = proc.poll()
+    if exit_code is None:
+        return True, None
+    RUN_PROCS.pop(run_id, None)
+    return False, int(exit_code)
+
+
+def finalize_run_manifest(run_dir: Path, manifest: dict, exit_code: int) -> dict:
+    status = normalize_status(manifest.get("status"))
+    if status != "running" or manifest.get("end_time"):
+        return manifest
+    payload = dict(manifest)
+    payload["status"] = "complete" if exit_code == 0 else "failed"
+    payload["end_time"] = datetime.now().isoformat(timespec="seconds")
+    if exit_code != 0 and not payload.get("error"):
+        payload["error"] = f"process exited with code {exit_code}"
+    write_json(run_dir / "run.json", payload)
+    return payload
 
 
 def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
@@ -202,8 +220,12 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
             manifest = json.loads(manifest_path.read_text())
         except json.JSONDecodeError:
             manifest = None
+    if manifest is not None and not isinstance(manifest, dict):
+        manifest = None
     stage = infer_stage(run_dir, manifest)
-    is_active = run_is_active(run_id)
+    is_active, exit_code = check_run_process(run_id)
+    if manifest and exit_code is not None:
+        manifest = finalize_run_manifest(run_dir, manifest, exit_code)
     status = normalize_status(manifest.get("status") if manifest else None)
     if is_active:
         status = "running"
