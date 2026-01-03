@@ -135,7 +135,7 @@ A **built-in Python web interface** for:
 - `use_rope`: rotary position embeddings (disables absolute `pos_emb`)
 - `use_sdpa`: use PyTorch scaled dot-product attention on CUDA (CPU/MPS fallback to manual path)
 - `use_kv_cache`: cache K/V during generation for faster autoregressive decode
-- Example: `configs/training/modern_tiny__v001.json` enables a modern tiny stack
+- Example: `configs/training/moderntiny__v007.json` enables a modern tiny stack
 
 
 
@@ -146,22 +146,24 @@ A **built-in Python web interface** for:
 # Install dependencies
 pip install -r requirements.txt
 
-# Run an end-to-end pipeline (data → tokenizer → train)
-python -m scripts.pipeline --config configs/pipeline.json
+# Run an end-to-end pipeline (data → tokenizer → tokenize → train)
+# Either edit configs/pipeline.json or pass --set overrides for required paths.
+python -m scripts.pipeline --config configs/pipeline.json \
+  --set tokenizer.input=data/simple_wikipedia.txt \
+  --set train.data=data/simple_wikipedia.txt
 
-# Launch web UI (inspect the latest training run)
-python -m scripts.web_ui --run-dir runs/train/latest
+# Launch web UI (auto-loads the latest training run when available)
+python -m scripts.web_ui
 
 # Or use CLI directly
-python -m scripts.train_tokenizer --config configs/tokenizer/default__v002.json
-python -m scripts.tokenize_dataset --config configs/tokenize_dataset/default__v001.json --dataset-manifest runs/datasets/latest/dataset_manifest.json
-python -m scripts.train_model --config configs/training/default__v001.json
-python -m scripts.pipeline --config configs/pipeline.json
+python -m scripts.train_tokenizer --config configs/tokenizer/default__v002.json --input data/simple_wikipedia.txt
+python -m scripts.tokenize_dataset --config configs/tokenize_dataset/default__v001.json --snapshot data/simple_wikipedia.txt
+python -m scripts.train_model --config configs/training/default__v001.json --data data/simple_wikipedia.txt
 ```
 
 ### **Example Workflow**
 1. Add training data to `data/*.txt`
-2. Create dataset snapshot via Web UI or CLI
+2. Create dataset snapshot via Web UI
 3. Train tokenizer on snapshot
 4. Configure model architecture
 5. Train model with real-time monitoring
