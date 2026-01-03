@@ -443,6 +443,7 @@
               <label>Temp <input id="inspectTemperature" type="number" value="1.0" min="0" max="2" step="0.05" /></label>
               <label>Top-p <input id="inspectTopP" type="number" value="0.9" min="0" max="1" step="0.05" /></label>
               <label>Top-k <input id="inspectTopKSample" type="number" value="0" min="0" max="200" /></label>
+              <label>Repeat penalty <input id="inspectRepetitionPenalty" type="number" value="1.0" min="1" max="3" step="0.05" /></label>
               <button id="inspectGenerateBtn">Generate</button>
             </div>
             <textarea id="promptInput" placeholder="Type a prompt..." spellcheck="false"></textarea>
@@ -529,6 +530,7 @@
               <label>Temp <input id="chatTemperature" type="number" value="1.0" min="0" max="2" step="0.05" /></label>
               <label>Top-p <input id="chatTopP" type="number" value="0.9" min="0" max="1" step="0.05" /></label>
               <label>Top-k <input id="chatTopK" type="number" value="0" min="0" max="200" /></label>
+              <label>Repeat penalty <input id="chatRepetitionPenalty" type="number" value="1.0" min="1" max="3" step="0.05" /></label>
             </div>
             <div class="meta">Adjust sampling to shape the assistant response.</div>
           </div>

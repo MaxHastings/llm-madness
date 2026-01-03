@@ -1377,11 +1377,14 @@ class Handler(BaseHTTPRequestHandler):
                 temperature = float(payload.get("temperature", 1.0))
                 top_p = float(payload.get("top_p", 1.0))
                 top_k = int(payload.get("top_k", 0))
+                repetition_penalty = float(payload.get("repetition_penalty", 1.0))
                 if temperature < 0:
                     temperature = 0.0
                 top_p = max(0.0, min(top_p, 1.0))
                 if top_k < 0:
                     top_k = 0
+                if repetition_penalty < 1.0:
+                    repetition_penalty = 1.0
                 if not ids:
                     self._send_json({"error": "no ids provided"}, status=400)
                     return
@@ -1390,6 +1393,12 @@ class Handler(BaseHTTPRequestHandler):
                 with torch.no_grad():
                     logits, _ = STATE.model(idx)
                     logits = logits[:, -1, :]
+                if repetition_penalty > 1.0:
+                    vocab_size = logits.size(-1)
+                    seen = {int(token_id) for token_id in ids if isinstance(token_id, int)}
+                    for token_id in seen:
+                        if 0 <= token_id < vocab_size:
+                            logits[:, token_id] /= repetition_penalty
                 if temperature <= 0:
                     token_id = int(torch.argmax(logits, dim=-1).item())
                     token = STATE.tokenizer.id_to_token(token_id)

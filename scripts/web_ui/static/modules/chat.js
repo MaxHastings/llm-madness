@@ -164,10 +164,12 @@ async function generateAssistant() {
     const temperature = clampNumber(parseFloat(els.chatTemperature.value || '1.0'), 0, 2, 1.0);
     const topP = clampNumber(parseFloat(els.chatTopP.value || '0.9'), 0, 1, 1.0);
     const topK = clampNumber(parseInt(els.chatTopK.value || '0', 10), 0, 200, 0);
+    const repetitionPenalty = clampNumber(parseFloat(els.chatRepetitionPenalty.value || '1.0'), 1, 3, 1.0);
     els.chatMaxTokens.value = maxTokens;
     els.chatTemperature.value = temperature;
     els.chatTopP.value = topP;
     els.chatTopK.value = topK;
+    els.chatRepetitionPenalty.value = repetitionPenalty;
 
     let generated = [];
     let hitEnd = false;
@@ -190,6 +192,7 @@ async function generateAssistant() {
         temperature,
         top_p: topP,
         top_k: topK,
+        repetition_penalty: repetitionPenalty,
       });
       if (!data || data.error) {
         setStatus(data?.error || 'generation failed');

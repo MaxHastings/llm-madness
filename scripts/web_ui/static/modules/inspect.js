@@ -43,12 +43,15 @@ async function runSampling() {
   const temperature = parseFloat(els.inspectTemperature.value || '1.0');
   const topP = parseFloat(els.inspectTopP.value || '0.9');
   const topK = parseInt(els.inspectTopKSample.value || '0', 10);
+  const repetitionPenalty = parseFloat(els.inspectRepetitionPenalty.value || '1.0');
   const safeTemp = Number.isFinite(temperature) ? Math.max(0, Math.min(temperature, 2)) : 1.0;
   const safeTopP = Number.isFinite(topP) ? Math.max(0, Math.min(topP, 1)) : 1.0;
   const safeTopK = Number.isFinite(topK) ? Math.max(0, Math.min(topK, 200)) : 0;
+  const safePenalty = Number.isFinite(repetitionPenalty) ? Math.max(1, Math.min(repetitionPenalty, 3)) : 1.0;
   els.inspectTemperature.value = safeTemp;
   els.inspectTopP.value = safeTopP;
   els.inspectTopKSample.value = safeTopK;
+  els.inspectRepetitionPenalty.value = safePenalty;
   if (els.promptRolloutMeta) {
     els.promptRolloutMeta.textContent = 'generating...';
   }
@@ -61,6 +64,7 @@ async function runSampling() {
         temperature: safeTemp,
         top_p: safeTopP,
         top_k: safeTopK,
+        repetition_penalty: safePenalty,
       });
       if (!data || data.error) {
         if (els.promptRolloutMeta) {
@@ -76,7 +80,7 @@ async function runSampling() {
     els.inspectGenerateBtn.disabled = false;
     if (els.promptRolloutMeta) {
       els.promptRolloutMeta.textContent = generated
-        ? `generated ${generated} tokens @ temp ${safeTemp} top-p ${safeTopP} top-k ${safeTopK || 'off'}`
+        ? `generated ${generated} tokens @ temp ${safeTemp} top-p ${safeTopP} top-k ${safeTopK || 'off'} repeat ${safePenalty}`
         : '';
     }
   }
