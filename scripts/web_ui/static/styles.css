@@ -241,8 +241,21 @@ main {
   align-items: start;
 }
 
+.chat-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.4fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .inspector-left,
 .inspector-right {
+  display: grid;
+  gap: 18px;
+}
+
+.chat-left,
+.chat-right {
   display: grid;
   gap: 18px;
 }
@@ -270,6 +283,25 @@ main {
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 10px;
+}
+
+.chat-preview {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+}
+
+.preview-body {
+  display: grid;
+  overflow: hidden;
+}
+
+.preview-panel {
+  height: 100%;
 }
 
 .vocab-stack {
@@ -314,13 +346,77 @@ main {
   border-color: var(--accent-2);
 }
 
-.preview-body {
-  display: grid;
-  overflow: hidden;
+.chat-thread {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel-2);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  min-height: 200px;
 }
 
-.preview-panel {
+.chat-bubble {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 14px;
+  background: var(--panel-3);
+  box-shadow: 0 8px 16px var(--shadow);
+  max-width: 78%;
+}
+
+.chat-bubble.user {
+  border-color: var(--accent-2);
+  background: var(--accent-2);
+  color: #fff;
+  align-self: flex-end;
+}
+
+.chat-bubble.assistant {
+  border-color: var(--border);
+  background: var(--panel-4);
+  align-self: flex-start;
+}
+
+.chat-role {
+  display: none;
+}
+
+.chat-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-raw {
+  min-height: 160px;
   height: 100%;
+  font-family: var(--mono);
+}
+.chat-body {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  gap: 10px;
+  min-height: 0;
+}
+
+.chat-raw-wrap {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--panel-7);
+}
+
+.chat-composer {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.chat-composer textarea {
+  min-height: 110px;
 }
 
 .dataset-preview textarea {
@@ -1066,6 +1162,15 @@ button.token-btn:hover {
 
   .inspector-layout {
     grid-template-columns: 1fr;
+  }
+
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-preview {
+    position: static;
+    max-height: none;
   }
 
   .panel-head {

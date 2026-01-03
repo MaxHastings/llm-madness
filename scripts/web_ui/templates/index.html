@@ -24,6 +24,7 @@
         <button class="nav-btn" data-section="training-configs">Training Configs</button>
         <button class="nav-btn" data-section="runs">Training Runs</button>
         <button class="nav-btn" data-section="inspector">Inspect</button>
+        <button class="nav-btn" data-section="chat">Chat</button>
       </nav>
     </aside>
     <main>
@@ -494,6 +495,66 @@
                     </thead>
                     <tbody></tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section" data-section="chat">
+      <div class="chat-layout">
+        <div class="chat-left">
+          <div class="panel">
+            <h2>Model Session</h2>
+            <div class="controls">
+              <span class="meta" id="chatRunMeta">Loading run...</span>
+            </div>
+            <div class="controls">
+              <select id="chatSessionRunSelect"></select>
+              <button id="chatLoadSessionRun" class="primary">Load Run</button>
+              <span class="meta" id="chatSessionRunMeta"></span>
+            </div>
+            <div class="controls">
+              <select id="chatCheckpointSelect"></select>
+              <button id="chatLoadCheckpoint" class="primary">Load</button>
+              <span class="meta" id="chatCheckpointMeta"></span>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Sampling Controls</h2>
+            <div class="controls">
+              <label>Max new tokens <input id="chatMaxTokens" type="number" value="128" min="1" max="512" /></label>
+              <label>Temp <input id="chatTemperature" type="number" value="1.0" min="0" max="2" step="0.05" /></label>
+              <label>Top-p <input id="chatTopP" type="number" value="0.9" min="0" max="1" step="0.05" /></label>
+              <label>Top-k <input id="chatTopK" type="number" value="0" min="0" max="200" /></label>
+            </div>
+            <div class="meta">Adjust sampling to shape the assistant response.</div>
+          </div>
+        </div>
+        <div class="chat-right">
+          <div class="panel chat-preview">
+            <div class="panel-head">
+              <div>
+                <h2>Chat</h2>
+                <div class="meta" id="chatTranscriptMeta">Special tokens are hidden.</div>
+              </div>
+              <div class="controls">
+                <label class="meta toggle"><input id="chatDebugToggle" type="checkbox" /> Debug</label>
+              </div>
+            </div>
+            <div class="chat-body">
+              <div id="chatMessages" class="chat-thread"></div>
+              <div class="chat-raw-wrap is-hidden">
+                <textarea id="chatTranscript" class="chat-raw" readonly spellcheck="false"></textarea>
+              </div>
+              <div class="chat-composer">
+                <textarea id="chatInput" placeholder="Send a message..." spellcheck="false"></textarea>
+                <div class="controls">
+                  <button id="chatSend" class="primary">Send</button>
+                  <button id="chatClear">Clear</button>
+                  <span class="meta" id="chatStatus"></span>
                 </div>
               </div>
             </div>
