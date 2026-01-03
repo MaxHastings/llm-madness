@@ -290,6 +290,7 @@ main {
   top: 20px;
   align-self: start;
   max-height: calc(100vh - 40px);
+  height: calc(100vh - 40px);
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 10px;
@@ -399,6 +400,7 @@ main {
   grid-template-rows: 1fr auto auto;
   gap: 10px;
   min-height: 0;
+  height: 100%;
 }
 
 .chat-raw-wrap {
