@@ -90,6 +90,7 @@ export const els = {
   runOverrideMaxIters: byId('runOverrideMaxIters'),
   runOverrideBatchSize: byId('runOverrideBatchSize'),
   runOverrideEvalInterval: byId('runOverrideEvalInterval'),
+  runOverrideWarmupIters: byId('runOverrideWarmupIters'),
   runOverrideSeed: byId('runOverrideSeed'),
   runOverrideDevice: byId('runOverrideDevice'),
 

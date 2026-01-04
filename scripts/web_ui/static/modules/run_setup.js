@@ -256,6 +256,15 @@ async function createTrainRun() {
     }
     overrides['training.eval_interval'] = String(parsed);
   }
+  const warmupIters = (els.runOverrideWarmupIters?.value || '').trim();
+  if (warmupIters) {
+    const parsed = Number(warmupIters);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      els.runSetupMeta.textContent = 'Invalid warmup iters override.';
+      return;
+    }
+    overrides['training.warmup_iters'] = String(parsed);
+  }
   const seed = (els.runOverrideSeed?.value || '').trim();
   if (seed) {
     const parsed = Number(seed);
