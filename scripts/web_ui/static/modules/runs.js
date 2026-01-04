@@ -11,6 +11,7 @@ let currentInspectorTab = 'overview';
 const liveLogsEnabled = true;
 let logStream = null;
 let lossStream = null;
+let progressStream = null;
 let runLossLogs = [];
 let datasetsCache = null;
 let datasetsCacheAt = 0;
@@ -375,6 +376,54 @@ function renderRunDetails(summary, manifest) {
   }
 }
 
+function formatProgressValue(value) {
+  if (value == null) return '-';
+  if (Number.isFinite(value)) return `${value}`;
+  return `${value}`;
+}
+
+function renderProgress(payload) {
+  if (!els.runProgressMeta || !els.runProgressLine) return;
+  if (!payload || typeof payload !== 'object') {
+    els.runProgressMeta.textContent = '';
+    els.runProgressLine.textContent = '';
+    return;
+  }
+  const stage = payload.stage || 'unknown';
+  const status = payload.status || 'running';
+  const message = payload.message || '';
+  const processed = Number.isFinite(payload.processed_lines) ? payload.processed_lines : null;
+  const total = Number.isFinite(payload.total_lines) ? payload.total_lines : null;
+  const percent = total && processed != null ? Math.min(100, (processed / total) * 100) : null;
+  const trainTokens = Number.isFinite(payload.train_tokens) ? payload.train_tokens : null;
+  const valTokens = Number.isFinite(payload.val_tokens) ? payload.val_tokens : null;
+  const elapsed = Number.isFinite(payload.elapsed_seconds) ? payload.elapsed_seconds : null;
+  const updatedAt = payload.updated_at || null;
+
+  const metaParts = [`${stage}`, `${status}`];
+  if (updatedAt) metaParts.push(`updated ${updatedAt}`);
+  els.runProgressMeta.textContent = metaParts.join(' | ');
+
+  const lines = [];
+  if (message) lines.push(message);
+  if (processed != null && total != null) {
+    const pct = percent != null ? ` (${percent.toFixed(1)}%)` : '';
+    lines.push(`lines: ${formatProgressValue(processed)}/${formatProgressValue(total)}${pct}`);
+  }
+  if (trainTokens != null || valTokens != null) {
+    const trainLabel = trainTokens != null ? formatProgressValue(trainTokens) : '-';
+    const valLabel = valTokens != null ? formatProgressValue(valTokens) : '-';
+    lines.push(`tokens: train ${trainLabel} | val ${valLabel}`);
+  }
+  if (elapsed != null) {
+    lines.push(`elapsed: ${elapsed.toFixed(1)}s`);
+  }
+  if (payload.token_dataset_dir) {
+    lines.push(`token dataset: ${payload.token_dataset_dir}`);
+  }
+  els.runProgressLine.textContent = lines.join('\n');
+}
+
 function clearTokenizerReport() {
   if (!els.runTokenizerReportTableBody) return;
   els.runTokenizerReportTableBody.innerHTML = '';
@@ -527,6 +576,8 @@ async function showRunDetails(runDir) {
     renderRunLossChart();
   }
   setInspectorTab(currentInspectorTab);
+  renderProgress(null);
+  startProgressStream();
   renderRunsFromCache();
 }
 
@@ -542,6 +593,37 @@ function stopLossStream() {
     lossStream.close();
     lossStream = null;
   }
+}
+
+function stopProgressStream() {
+  if (progressStream) {
+    progressStream.close();
+    progressStream = null;
+  }
+}
+
+function startProgressStream() {
+  if (!selectedRun) return;
+  stopProgressStream();
+  const params = new URLSearchParams({
+    run_dir: selectedRun.run_dir,
+    kind: 'progress',
+  });
+  progressStream = new EventSource(`/api/run/stream?${params.toString()}`);
+  progressStream.onmessage = (event) => {
+    if (!event.data) return;
+    try {
+      const payload = JSON.parse(event.data);
+      renderProgress(payload);
+    } catch (err) {
+      renderProgress({ message: event.data });
+    }
+  };
+  progressStream.onerror = () => {
+    if (els.runProgressMeta) {
+      els.runProgressMeta.textContent = 'Progress stream disconnected. Retrying...';
+    }
+  };
 }
 
 function ensureLossStream() {
@@ -657,6 +739,8 @@ function clearRunDetail() {
   selectedRunDetails = null;
   els.runDetailMeta.textContent = 'Select a run to inspect.';
   els.runLoadStatus.textContent = '';
+  if (els.runProgressMeta) els.runProgressMeta.textContent = '';
+  if (els.runProgressLine) els.runProgressLine.textContent = '';
   els.runDetails.innerHTML = '';
   els.runLogs.textContent = '';
   clearTokenizerReport();
@@ -667,6 +751,7 @@ function clearRunDetail() {
   renderRunLossChart();
   stopLogStream();
   stopLossStream();
+  stopProgressStream();
 }
 
 function renderRunsFromCache() {

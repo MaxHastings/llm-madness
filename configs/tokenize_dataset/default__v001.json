@@ -9,6 +9,7 @@
   "tokenize": {
     "val_split": 0.1,
     "chunk_size_chars": 2000000,
+    "batch_size": 8,
     "use_content_hash": true
   }
 }

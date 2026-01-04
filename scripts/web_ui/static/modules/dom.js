@@ -54,6 +54,8 @@ export const els = {
   runLossMeta: byId('runLossMeta'),
   runLogs: byId('runLogs'),
   runLoadStatus: byId('runLoadStatus'),
+  runProgressMeta: byId('runProgressMeta'),
+  runProgressLine: byId('runProgressLine'),
 
   datasetPath: byId('datasetPath'),
   datasetRefreshBtn: byId('datasetRefresh'),

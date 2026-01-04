@@ -18,7 +18,7 @@ os.environ.setdefault("KMP_USE_SHM", "0")
 
 import torch
 
-from llm_madness.datasets.manifest import create_dataset_manifest
+from llm_madness.datasets.manifest import create_dataset_manifest, load_dataset_manifest
 from llm_madness.tokenizer import load_tokenizer
 from llm_madness.checkpoints import (
     checkpoint_supports_resume,
@@ -28,7 +28,7 @@ from llm_madness.checkpoints import (
 )
 from llm_madness.runs import finish_manifest
 from llm_madness.config import load_config
-from llm_madness.utils import find_latest_run, timestamp, write_json
+from llm_madness.utils import find_latest_run, sha256_file, sha256_text, timestamp, write_json
 
 from .state import ServerState
 
@@ -46,6 +46,7 @@ RUNS_ROOT = Path("runs")
 DATA_ROOT = REPO_ROOT / "data"
 DATASETS_DIR = RUNS_ROOT / "datasets"
 TOKENIZER_RUNS_DIR = RUNS_ROOT / "tokenizer"
+TOKEN_DATASETS_DIR = RUNS_ROOT / "tokens"
 RUN_PROCS: dict[str, dict] = {}
 
 
@@ -69,6 +70,14 @@ def parse_iso(ts: str | None) -> datetime | None:
         return datetime.fromisoformat(ts)
     except ValueError:
         return None
+
+
+def parse_run_id_timestamp(run_id: str) -> str | None:
+    try:
+        parsed = datetime.strptime(run_id, "%Y%m%d_%H%M%S")
+    except ValueError:
+        return None
+    return parsed.isoformat(timespec="seconds")
 
 
 def format_duration(seconds: float | None) -> str | None:
@@ -320,10 +329,34 @@ def build_run_summary(run_dir: Path, manifest: dict | None = None) -> dict:
     if manifest and not is_active:
         manifest = finalize_stale_manifest(run_dir, manifest)
     status = normalize_status(manifest.get("status") if manifest else None)
+    progress = None
+    progress_path = run_dir / "progress.json"
+    if progress_path.exists():
+        try:
+            progress = json.loads(progress_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            progress = None
     if is_active:
         status = "running"
+    if status == "unknown" and isinstance(progress, dict):
+        raw_progress_status = progress.get("status")
+        progress_status = normalize_status(
+            str(raw_progress_status) if raw_progress_status is not None else None
+        )
+        if progress_status == "unknown":
+            raw = str(raw_progress_status).lower() if raw_progress_status is not None else ""
+            if raw in {"starting", "cached"}:
+                progress_status = "queued"
+        if progress_status != "unknown":
+            status = progress_status
     start_time = manifest.get("start_time") if manifest else None
     end_time = manifest.get("end_time") if manifest else None
+    if not start_time:
+        start_time = parse_run_id_timestamp(run_id)
+    if not start_time and isinstance(progress, dict):
+        updated_at = progress.get("updated_at")
+        if isinstance(updated_at, str):
+            start_time = updated_at
     start_dt = parse_iso(start_time)
     end_dt = parse_iso(end_time)
     if start_dt:
@@ -389,6 +422,230 @@ def resolve_latest_path(path: Path) -> Path:
     return latest / suffix
 
 
+def _fingerprint_path(path: Path, use_content_hash: bool) -> str:
+    if use_content_hash:
+        return sha256_file(path)
+    stat = path.stat()
+    return f"stat:{stat.st_size}:{int(stat.st_mtime)}"
+
+
+def _token_dataset_key(snapshot_fp: str, tokenizer_fp: str, val_split: float) -> str:
+    val_tag = f"{val_split:.6f}"
+    raw = f"{snapshot_fp}|{tokenizer_fp}|{val_tag}"
+    return sha256_text(raw)
+
+
+def _write_progress(path: Path, payload: dict) -> None:
+    payload = dict(payload)
+    payload["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _load_token_dataset_meta(run_dir: Path) -> dict | None:
+    meta_path = run_dir / "meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(meta, dict):
+        return None
+    if meta.get("kind") != "TokenDataset":
+        return None
+    return meta
+
+
+def _token_dataset_matches(run_dir: Path, snapshot_fp: str, tokenizer_fp: str, val_split: float) -> bool:
+    meta = _load_token_dataset_meta(run_dir)
+    if not meta:
+        return False
+    if meta.get("snapshot_fingerprint") != snapshot_fp:
+        return False
+    if meta.get("tokenizer_fingerprint") != tokenizer_fp:
+        return False
+    try:
+        meta_val = float(meta.get("val_split", 0.0))
+    except (TypeError, ValueError):
+        return False
+    return abs(meta_val - val_split) < 1e-9
+
+
+def _find_token_dataset(snapshot_fp: str, tokenizer_fp: str, val_split: float) -> Path | None:
+    if not TOKEN_DATASETS_DIR.exists():
+        return None
+    for run_dir in sorted(TOKEN_DATASETS_DIR.iterdir()):
+        if not run_dir.is_dir():
+            continue
+        if _token_dataset_matches(run_dir, snapshot_fp, tokenizer_fp, val_split):
+            return run_dir
+    return None
+
+
+def _resolve_token_dataset_snapshot(data_path: Path) -> Path | None:
+    if not data_path.is_dir():
+        return data_path
+    meta = _load_token_dataset_meta(data_path)
+    if not meta:
+        return None
+    snapshot_path = meta.get("snapshot_path")
+    if not snapshot_path:
+        return None
+    candidate = Path(str(snapshot_path))
+    return candidate if candidate.exists() else None
+
+
+def _ensure_token_dataset(
+    dataset_manifest_path: Path,
+    tokenizer_path: Path,
+    training_config: dict,
+    log_file,
+    env: dict,
+    progress_path: Path | None = None,
+) -> Path:
+    tokenize_config_path = CONFIGS_DIR / "tokenize_dataset" / "default__v001.json"
+    if not tokenize_config_path.exists():
+        raise SystemExit(f"tokenize dataset config missing: {tokenize_config_path}")
+
+    tokenize_config = load_config(tokenize_config_path)
+    tokenize_cfg = tokenize_config.get("tokenize", {}) if isinstance(tokenize_config, dict) else {}
+    use_content_hash = bool(tokenize_cfg.get("use_content_hash", True))
+
+    manifest = load_dataset_manifest(dataset_manifest_path)
+    snapshot_path = Path(str(manifest.get("snapshot_path", "")))
+    if not snapshot_path.exists():
+        raise SystemExit(f"dataset snapshot missing: {snapshot_path}")
+
+    val_split = float(training_config.get("training", {}).get("val_split", 0.0))
+    snapshot_fp = _fingerprint_path(snapshot_path, use_content_hash)
+    tokenizer_fp = _fingerprint_path(tokenizer_path, use_content_hash)
+    key = _token_dataset_key(snapshot_fp, tokenizer_fp, val_split)
+
+    TOKEN_DATASETS_DIR.mkdir(parents=True, exist_ok=True)
+    preferred_id = f"auto_{key[:16]}"
+    preferred_dir = TOKEN_DATASETS_DIR / preferred_id
+    if _token_dataset_matches(preferred_dir, snapshot_fp, tokenizer_fp, val_split):
+        if progress_path:
+            _write_progress(
+                progress_path,
+                {
+                    "kind": "RunProgress",
+                    "version": 1,
+                    "stage": "tokenize_dataset",
+                    "status": "cached",
+                    "message": "using cached token dataset",
+                    "token_dataset_dir": str(preferred_dir),
+                    "snapshot_path": str(snapshot_path),
+                    "tokenizer_path": str(tokenizer_path),
+                    "val_split": val_split,
+                },
+            )
+        log_file.write(f"[tokenize_dataset] using cached tokens {preferred_dir}\n")
+        log_file.flush()
+        return preferred_dir
+
+    existing = _find_token_dataset(snapshot_fp, tokenizer_fp, val_split)
+    if existing is not None:
+        if progress_path:
+            _write_progress(
+                progress_path,
+                {
+                    "kind": "RunProgress",
+                    "version": 1,
+                    "stage": "tokenize_dataset",
+                    "status": "cached",
+                    "message": "using cached token dataset",
+                    "token_dataset_dir": str(existing),
+                    "snapshot_path": str(snapshot_path),
+                    "tokenizer_path": str(tokenizer_path),
+                    "val_split": val_split,
+                },
+            )
+        log_file.write(f"[tokenize_dataset] using cached tokens {existing}\n")
+        log_file.flush()
+        return existing
+
+    run_id = preferred_id
+    if preferred_dir.exists():
+        run_id = f"{preferred_id}_{timestamp()}"
+
+    log_file.write("[tokenize_dataset] auto-caching token dataset...\n")
+    log_file.flush()
+    run_dir = TOKEN_DATASETS_DIR / run_id
+    if progress_path:
+        _write_progress(
+            progress_path,
+            {
+                "kind": "RunProgress",
+                "version": 1,
+                "stage": "tokenize_dataset",
+                "status": "running",
+                "message": "tokenizing dataset",
+                "token_dataset_dir": str(run_dir),
+                "snapshot_path": str(snapshot_path),
+                "tokenizer_path": str(tokenizer_path),
+                "val_split": val_split,
+            },
+        )
+    cmd = [
+        sys.executable,
+        "-m",
+        "scripts.tokenize_dataset",
+        "--config",
+        str(tokenize_config_path),
+        "--dataset-manifest",
+        str(dataset_manifest_path),
+        "--tokenizer",
+        str(tokenizer_path),
+        "--output-dir",
+        str(TOKEN_DATASETS_DIR),
+        "--set",
+        f"run.id={run_id}",
+        "--set",
+        f"tokenize.val_split={val_split}",
+    ]
+    proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
+    progress_source = run_dir / "progress.json"
+    last_progress = ""
+    while proc.poll() is None:
+        if progress_path and progress_source.exists():
+            try:
+                raw = progress_source.read_text(encoding="utf-8")
+            except OSError:
+                raw = ""
+            if raw and raw != last_progress:
+                try:
+                    payload = json.loads(raw)
+                except json.JSONDecodeError:
+                    payload = {"raw": raw}
+                if isinstance(payload, dict):
+                    payload = dict(payload)
+                    payload["kind"] = "RunProgress"
+                if isinstance(payload, dict) and "status" not in payload:
+                    payload["status"] = "running"
+                if isinstance(payload, dict):
+                    _write_progress(progress_path, payload)
+                last_progress = raw
+        time.sleep(0.5)
+    if proc.returncode != 0:
+        raise SystemExit("tokenize_dataset failed; see process.log for details")
+
+    if progress_path and progress_source.exists():
+        try:
+            raw = progress_source.read_text(encoding="utf-8")
+            payload = json.loads(raw)
+        except (OSError, json.JSONDecodeError):
+            payload = None
+        if isinstance(payload, dict):
+            payload = dict(payload)
+            payload["kind"] = "RunProgress"
+            payload["status"] = payload.get("status") or "complete"
+            _write_progress(progress_path, payload)
+    if not _token_dataset_matches(run_dir, snapshot_fp, tokenizer_fp, val_split):
+        raise SystemExit("tokenize_dataset produced unexpected metadata")
+    return run_dir
+
+
 def build_tokenizer_report(run_dir: Path, top_n: int = 25, max_chars: int = 200_000) -> dict:
     manifest_path = run_dir / "run.json"
     if not manifest_path.exists():
@@ -413,9 +670,12 @@ def build_tokenizer_report(run_dir: Path, top_n: int = 25, max_chars: int = 200_
     data_path = resolve_latest_path(Path(data_path_raw))
     if not data_path.exists():
         return {"error": f"missing data file: {data_path_raw}"}
+    report_source = _resolve_token_dataset_snapshot(data_path)
+    if report_source is None or not report_source.exists():
+        return {"error": f"missing snapshot for data: {data_path_raw}"}
 
     tokenizer = load_tokenizer(tokenizer_path)
-    text = data_path.read_text(encoding="utf-8", errors="replace")
+    text = report_source.read_text(encoding="utf-8", errors="replace")
     if len(text) > max_chars:
         text = text[:max_chars]
 
@@ -791,8 +1051,11 @@ class Handler(BaseHTTPRequestHandler):
                 if RUNS_ROOT.resolve() not in run_path.parents and DATA_ROOT.resolve() not in run_path.parents:
                     self._send_json({"error": "invalid run path"}, status=400)
                     return
-                filename = "logs.jsonl" if kind == "logs" else "process.log"
-                target = run_path / filename
+                if kind == "progress":
+                    target = run_path / "progress.json"
+                else:
+                    filename = "logs.jsonl" if kind == "logs" else "process.log"
+                    target = run_path / filename
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
@@ -807,29 +1070,45 @@ class Handler(BaseHTTPRequestHandler):
                 last_ping = time.time()
                 try:
                     last_size = -1
+                    last_payload = ""
                     while True:
                         if not target.exists():
                             time.sleep(1)
                             continue
-                        size = target.stat().st_size
-                        if size < last_size:
-                            last_size = -1
-                        if last_size == -1:
-                            with target.open("r", encoding="utf-8", errors="ignore") as handle:
-                                lines = handle.read().splitlines()[-200:]
-                                for line in lines:
-                                    send_line(line)
-                            last_size = target.stat().st_size
+                        if kind == "progress":
+                            try:
+                                raw = target.read_text(encoding="utf-8")
+                            except OSError:
+                                raw = ""
+                            if raw and raw != last_payload:
+                                try:
+                                    payload = json.loads(raw)
+                                    line = json.dumps(payload, separators=(",", ":"))
+                                except json.JSONDecodeError:
+                                    line = raw.strip()
+                                send_line(line)
+                                last_payload = raw
+                            time.sleep(0.5)
+                        else:
+                            size = target.stat().st_size
+                            if size < last_size:
+                                last_size = -1
+                            if last_size == -1:
+                                with target.open("r", encoding="utf-8", errors="ignore") as handle:
+                                    lines = handle.read().splitlines()[-200:]
+                                    for line in lines:
+                                        send_line(line)
+                                last_size = target.stat().st_size
 
-                        with target.open("r", encoding="utf-8", errors="ignore") as handle:
-                            handle.seek(last_size)
-                            while True:
-                                line = handle.readline()
-                                if line:
-                                    send_line(line)
-                                else:
-                                    break
-                            last_size = handle.tell()
+                            with target.open("r", encoding="utf-8", errors="ignore") as handle:
+                                handle.seek(last_size)
+                                while True:
+                                    line = handle.readline()
+                                    if line:
+                                        send_line(line)
+                                    else:
+                                        break
+                                last_size = handle.tell()
 
                         if time.time() - last_ping > 10:
                             self.wfile.write(b": ping\n\n")
@@ -1101,6 +1380,12 @@ class Handler(BaseHTTPRequestHandler):
                         return
                 run_id = timestamp()
                 cmd = [sys.executable, "-m"]
+                overrides_list: list[str] = []
+                if isinstance(overrides, dict):
+                    for key, value in overrides.items():
+                        if value is None:
+                            continue
+                        overrides_list.append(f"{key}={value}")
                 if stage == "tokenizer":
                     if dataset_manifest_path is None:
                         self._send_json({"error": "dataset manifest required for tokenizer run"}, status=400)
@@ -1120,12 +1405,8 @@ class Handler(BaseHTTPRequestHandler):
                     cmd += ["scripts.train_model", "--config", str(config_path), "--set", f"run.id={run_id}"]
                     if run_name:
                         cmd += ["--set", f"meta.name={run_name}"]
-                    if isinstance(overrides, dict):
-                        for key, value in overrides.items():
-                            if value is None:
-                                continue
-                            cmd += ["--set", f"{key}={value}"]
-                    cmd += ["--dataset-manifest", str(dataset_manifest_path)]
+                    for item in overrides_list:
+                        cmd += ["--set", item]
                     cmd += ["--tokenizer", str(tokenizer_path_resolved)]
                     if init_checkpoint_path is not None:
                         cmd += ["--init-checkpoint", str(init_checkpoint_path)]
@@ -1137,10 +1418,80 @@ class Handler(BaseHTTPRequestHandler):
                 run_dir.mkdir(parents=True, exist_ok=True)
                 log_path = run_dir / "process.log"
                 log_file = log_path.open("a")
+                progress_path = run_dir / "progress.json"
                 env = os.environ.copy()
-                env.setdefault("TOKENIZERS_PARALLELISM", "false")
+                env.setdefault("TOKENIZERS_PARALLELISM", "true")
                 env.setdefault("KMP_SHM_DISABLE", "1")
                 env.setdefault("KMP_USE_SHM", "0")
+                if stage == "train":
+                    try:
+                        training_config = load_config(config_path, overrides=overrides_list)
+                        _write_progress(
+                            progress_path,
+                            {
+                                "kind": "RunProgress",
+                                "version": 1,
+                                "stage": "tokenize_dataset",
+                                "status": "starting",
+                                "message": "preparing token dataset",
+                                "run_dir": str(run_dir),
+                            },
+                        )
+                        token_dataset_dir = _ensure_token_dataset(
+                            dataset_manifest_path,
+                            tokenizer_path_resolved,
+                            training_config,
+                            log_file,
+                            env,
+                            progress_path=progress_path,
+                        )
+                    except SystemExit as exc:
+                        log_file.write(f"[tokenize_dataset] failed: {exc}\n")
+                        log_file.flush()
+                        log_file.close()
+                        _write_progress(
+                            progress_path,
+                            {
+                                "kind": "RunProgress",
+                                "version": 1,
+                                "stage": "tokenize_dataset",
+                                "status": "failed",
+                                "message": str(exc),
+                                "run_dir": str(run_dir),
+                            },
+                        )
+                        self._send_json({"error": str(exc)}, status=500)
+                        return
+                    except Exception as exc:
+                        log_file.write(f"[tokenize_dataset] failed: {exc}\n")
+                        log_file.flush()
+                        log_file.close()
+                        _write_progress(
+                            progress_path,
+                            {
+                                "kind": "RunProgress",
+                                "version": 1,
+                                "stage": "tokenize_dataset",
+                                "status": "failed",
+                                "message": str(exc),
+                                "run_dir": str(run_dir),
+                            },
+                        )
+                        self._send_json({"error": "tokenize_dataset failed"}, status=500)
+                        return
+                    cmd += ["--data", str(token_dataset_dir)]
+                    _write_progress(
+                        progress_path,
+                        {
+                            "kind": "RunProgress",
+                            "version": 1,
+                            "stage": "train",
+                            "status": "starting",
+                            "message": "starting training run",
+                            "run_dir": str(run_dir),
+                            "token_dataset_dir": str(token_dataset_dir),
+                        },
+                    )
                 proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
                 RUN_PROCS[run_id] = {"process": proc, "stage": stage, "run_dir": str(run_dir)}
                 self._send_json({"run_id": run_id, "run_dir": str(run_dir), "stage": stage})
@@ -1223,7 +1574,7 @@ class Handler(BaseHTTPRequestHandler):
                 log_path = run_dir / "process.log"
                 log_file = log_path.open("a")
                 env = os.environ.copy()
-                env.setdefault("TOKENIZERS_PARALLELISM", "false")
+                env.setdefault("TOKENIZERS_PARALLELISM", "true")
                 env.setdefault("KMP_SHM_DISABLE", "1")
                 env.setdefault("KMP_USE_SHM", "0")
                 proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)

@@ -52,6 +52,12 @@ def _write_ids(handle, ids: list[int], dtype: np.dtype) -> int:
     return int(arr.size)
 
 
+def _write_progress(path: Path, payload: dict) -> None:
+    payload = dict(payload)
+    payload["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
 def run_tokenize_dataset(
     config: dict,
     snapshot_path: Path,
@@ -63,6 +69,7 @@ def run_tokenize_dataset(
     tok_cfg = config.get("tokenize", {})
     val_split = float(tok_cfg.get("val_split", 0.0))
     chunk_size_chars = int(tok_cfg.get("chunk_size_chars", 2_000_000))
+    batch_size = int(tok_cfg.get("batch_size", 8))
     use_content_hash = bool(tok_cfg.get("use_content_hash", True))
 
     run_id = config.get("run", {}).get("id") if isinstance(config.get("run"), dict) else None
@@ -70,6 +77,7 @@ def run_tokenize_dataset(
     train_path = run_dir / "train.bin"
     val_path = run_dir / "val.bin"
     meta_path = run_dir / "meta.json"
+    progress_path = run_dir / "progress.json"
 
     start_manifest(
         "tokenize_dataset",
@@ -95,33 +103,88 @@ def run_tokenize_dataset(
         t0 = time.perf_counter()
         train_tokens = 0
         val_tokens = 0
+        last_progress = 0.0
+
+        _write_progress(
+            progress_path,
+            {
+                "kind": "TokenizeProgress",
+                "version": 1,
+                "stage": "tokenize_dataset",
+                "status": "running",
+                "run_id": run_dir.name,
+                "snapshot_path": str(snapshot_path),
+                "tokenizer_path": str(tokenizer_path),
+                "total_lines": split.line_count,
+                "processed_lines": 0,
+                "train_tokens": 0,
+                "val_tokens": 0,
+                "message": "tokenizing dataset",
+            },
+        )
 
         buffer = ""
         current_target = "train"
+        batch_chunks: list[str] = []
+        batch_targets: list[str] = []
 
-        def flush(target: str) -> None:
-            nonlocal buffer, train_tokens, val_tokens
+        def flush_batch(force: bool = False) -> None:
+            nonlocal batch_chunks, batch_targets, train_tokens, val_tokens
+            if not batch_chunks:
+                return
+            if not force and len(batch_chunks) < max(1, batch_size):
+                return
+            encodings = tokenizer.encode_batch(batch_chunks)
+            for encoding, target in zip(encodings, batch_targets):
+                ids = encoding.ids
+                if target == "train":
+                    train_tokens += _write_ids(train_handle, ids, dtype)
+                else:
+                    val_tokens += _write_ids(val_handle, ids, dtype)
+            batch_chunks = []
+            batch_targets = []
+
+        def push_buffer(target: str) -> None:
+            nonlocal buffer
             if not buffer:
                 return
-            ids = tokenizer.encode(buffer).ids
-            if target == "train":
-                with train_path.open("ab") as out:
-                    train_tokens += _write_ids(out, ids, dtype)
-            else:
-                with val_path.open("ab") as out:
-                    val_tokens += _write_ids(out, ids, dtype)
+            batch_chunks.append(buffer)
+            batch_targets.append(target)
             buffer = ""
+            flush_batch()
 
-        with snapshot_path.open("r", encoding="utf-8", errors="replace") as handle:
-            for line_idx, line in enumerate(handle):
-                target = "val" if (has_val and line_idx >= split.split_idx) else "train"
-                if target != current_target:
-                    flush(current_target)
-                    current_target = target
-                buffer += line
-                if len(buffer) >= chunk_size_chars:
-                    flush(current_target)
-            flush(current_target)
+        with train_path.open("ab") as train_handle, val_path.open("ab") as val_handle:
+            with snapshot_path.open("r", encoding="utf-8", errors="replace") as handle:
+                for line_idx, line in enumerate(handle):
+                    target = "val" if (has_val and line_idx >= split.split_idx) else "train"
+                    if target != current_target:
+                        push_buffer(current_target)
+                        current_target = target
+                    buffer += line
+                    if len(buffer) >= chunk_size_chars:
+                        push_buffer(current_target)
+                    if time.perf_counter() - last_progress >= 1.0:
+                        _write_progress(
+                            progress_path,
+                            {
+                                "kind": "TokenizeProgress",
+                                "version": 1,
+                                "stage": "tokenize_dataset",
+                                "status": "running",
+                                "run_id": run_dir.name,
+                                "snapshot_path": str(snapshot_path),
+                                "tokenizer_path": str(tokenizer_path),
+                                "total_lines": split.line_count,
+                                "processed_lines": line_idx + 1,
+                                "train_tokens": train_tokens,
+                                "val_tokens": val_tokens,
+                                "elapsed_seconds": time.perf_counter() - t0,
+                                "message": "tokenizing dataset",
+                            },
+                        )
+                        last_progress = time.perf_counter()
+                push_buffer(current_target)
+                flush_batch(force=True)
 
         # Ensure val.bin exists even if empty so training can memmap it reliably.
         val_path.touch(exist_ok=True)
@@ -166,9 +229,44 @@ def run_tokenize_dataset(
                 encoding="utf-8",
             )
 
+        _write_progress(
+            progress_path,
+            {
+                "kind": "TokenizeProgress",
+                "version": 1,
+                "stage": "tokenize_dataset",
+                "status": "complete",
+                "run_id": run_dir.name,
+                "snapshot_path": str(snapshot_path),
+                "tokenizer_path": str(tokenizer_path),
+                "total_lines": split.line_count,
+                "processed_lines": split.line_count,
+                "train_tokens": train_tokens,
+                "val_tokens": val_tokens,
+                "elapsed_seconds": elapsed,
+                "message": "tokenization complete",
+                "meta_path": str(meta_path),
+            },
+        )
         finish_manifest(run_dir, "complete", outputs={"run_dir": str(run_dir), "meta": str(meta_path)})
         return {"run_dir": run_dir, "meta_path": meta_path, "train_path": train_path, "val_path": val_path}
     except Exception as exc:
+        try:
+            _write_progress(
+                progress_path,
+                {
+                    "kind": "TokenizeProgress",
+                    "version": 1,
+                    "stage": "tokenize_dataset",
+                    "status": "failed",
+                    "run_id": run_dir.name,
+                    "snapshot_path": str(snapshot_path),
+                    "tokenizer_path": str(tokenizer_path),
+                    "message": str(exc),
+                },
+            )
+        except Exception:
+            pass
         finish_manifest(run_dir, "failed", error=str(exc))
         raise
 
