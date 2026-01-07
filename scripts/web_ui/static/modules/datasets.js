@@ -7,6 +7,8 @@ let currentPath = '';
 const selections = new Set();
 const selectionSizes = new Map();
 let selectedManifestPath = null;
+let progressStream = null;
+let activeRunDir = null;
 
 function formatBytes(bytes) {
   if (bytes == null) return '-';
@@ -36,6 +38,93 @@ function formatTokens(tokens) {
   }
   const precision = idx === 0 ? 0 : 1;
   return `${value.toFixed(precision)}${units[idx]} tokens`;
+}
+
+function formatElapsed(seconds) {
+  if (!Number.isFinite(seconds)) return null;
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  if (minutes > 0) {
+    return `${minutes}m ${secs}s`;
+  }
+  return `${secs}s`;
+}
+
+function extractRunId(runDir) {
+  if (!runDir) return '';
+  const normalized = runDir.replace(/\\/g, '/');
+  const parts = normalized.split('/').filter(Boolean);
+  return parts[parts.length - 1] || runDir;
+}
+
+function stopProgressStream() {
+  if (progressStream) {
+    progressStream.close();
+    progressStream = null;
+  }
+}
+
+function renderProgress(payload) {
+  if (!els.datasetProgressMeta || !els.datasetProgressLine) return;
+  if (!payload || typeof payload !== 'object') {
+    els.datasetProgressMeta.textContent = '';
+    els.datasetProgressLine.textContent = '';
+    return;
+  }
+  const stage = payload.stage || 'dataset';
+  const status = payload.status || 'running';
+  const updatedAt = payload.updated_at || null;
+  const metaParts = [stage, status];
+  if (updatedAt) metaParts.push(`updated ${updatedAt}`);
+  els.datasetProgressMeta.textContent = metaParts.join(' | ');
+
+  const lines = [];
+  if (payload.message) lines.push(payload.message);
+  const processed = Number.isFinite(payload.processed_files) ? payload.processed_files : null;
+  const total = Number.isFinite(payload.total_files) ? payload.total_files : null;
+  if (processed != null && total != null) {
+    const pct = total ? ` (${Math.min(100, (processed / total) * 100).toFixed(1)}%)` : '';
+    lines.push(`files: ${processed}/${total}${pct}`);
+  }
+  const elapsed = formatElapsed(payload.elapsed_seconds);
+  if (elapsed) lines.push(`elapsed: ${elapsed}`);
+  els.datasetProgressLine.textContent = lines.join('\n');
+}
+
+function startProgressStream(runDir) {
+  if (!runDir) return;
+  stopProgressStream();
+  activeRunDir = runDir;
+  renderProgress({ stage: 'dataset', status: 'running', message: `creating dataset | ${runDir}` });
+  const params = new URLSearchParams({
+    run_dir: runDir,
+    kind: 'progress',
+  });
+  progressStream = new EventSource(`/api/run/stream?${params.toString()}`);
+  progressStream.onmessage = (event) => {
+    if (!event.data) return;
+    try {
+      const payload = JSON.parse(event.data);
+      renderProgress(payload);
+      if (payload.status === 'complete') {
+        stopProgressStream();
+        els.datasetCreateMeta.textContent = `created ${extractRunId(activeRunDir)}`;
+        refreshDatasetManifests();
+        emitEvent('datasets:changed');
+      } else if (payload.status === 'failed') {
+        stopProgressStream();
+        els.datasetCreateMeta.textContent = `dataset failed: ${payload.message || 'unknown error'}`;
+      }
+    } catch (err) {
+      renderProgress({ message: event.data });
+    }
+  };
+  progressStream.onerror = () => {
+    if (els.datasetProgressMeta) {
+      els.datasetProgressMeta.textContent = 'Progress stream disconnected. Retrying...';
+    }
+  };
 }
 
 function renderSelections() {
@@ -281,8 +370,16 @@ async function createManifest() {
     name,
     selections: items,
     enable_content_hashes: enableHashes,
+    async: true,
   });
-  els.datasetCreateMeta.textContent = `created ${res.dataset_id} (files ${res.file_count}, ${formatBytes(res.total_bytes)})`;
+  if (res.status === 'started' && res.run_dir) {
+    els.datasetCreateMeta.textContent = `creating ${res.dataset_id}`;
+    startProgressStream(res.run_dir);
+  } else if (res.status === 'created') {
+    els.datasetCreateMeta.textContent = `created ${res.dataset_id} (files ${res.file_count}, ${formatBytes(res.total_bytes)})`;
+  } else {
+    els.datasetCreateMeta.textContent = res.error || 'dataset create failed';
+  }
   selections.clear();
   selectionSizes.clear();
   renderSelections();

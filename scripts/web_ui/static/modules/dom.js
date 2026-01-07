@@ -65,6 +65,8 @@ export const els = {
   datasetName: byId('datasetName'),
   datasetEnableHashes: byId('datasetEnableHashes'),
   datasetCreateBtn: byId('datasetCreate'),
+  datasetProgressMeta: byId('datasetProgressMeta'),
+  datasetProgressLine: byId('datasetProgressLine'),
   datasetCreateMeta: byId('datasetCreateMeta'),
   datasetManifestList: byId('datasetManifestList'),
   datasetRefreshManifestsBtn: byId('datasetRefreshManifests'),

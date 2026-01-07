@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+import threading
 from collections import Counter
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -1291,12 +1292,57 @@ class Handler(BaseHTTPRequestHandler):
                 selections = payload.get("selections", [])
                 name = payload.get("name") or None
                 enable_hashes = bool(payload.get("enable_content_hashes", False))
+                use_async = bool(payload.get("async", False))
                 if not isinstance(selections, list) or not selections:
                     self._send_json({"error": "selections required"}, status=400)
                     return
+                selections = [str(item) for item in selections]
+                if use_async:
+                    run_id = timestamp()
+                    run_dir = RUNS_ROOT / "datasets" / run_id
+                    progress_path = run_dir / "progress.json"
+                    run_dir.mkdir(parents=True, exist_ok=True)
+                    progress_path.write_text(
+                        json.dumps(
+                            {
+                                "kind": "RunProgress",
+                                "version": 1,
+                                "stage": "dataset",
+                                "status": "starting",
+                                "message": "starting dataset build",
+                                "updated_at": datetime.now().isoformat(timespec="seconds"),
+                            },
+                            indent=2,
+                            sort_keys=True,
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    def _run_dataset_manifest() -> None:
+                        try:
+                            create_dataset_manifest(
+                                name=name,
+                                selections=selections,
+                                data_root=DATA_ROOT,
+                                runs_root=RUNS_ROOT,
+                                enable_content_hashes=enable_hashes,
+                                repo_root=REPO_ROOT,
+                                run_id=run_id,
+                                progress_path=progress_path,
+                            )
+                        except Exception:
+                            return
+
+                    thread = threading.Thread(target=_run_dataset_manifest, daemon=True)
+                    thread.start()
+                    self._send_json(
+                        {"status": "started", "dataset_id": run_id, "run_dir": str(run_dir)}
+                    )
+                    return
+
                 result = create_dataset_manifest(
                     name=name,
-                    selections=[str(item) for item in selections],
+                    selections=selections,
                     data_root=DATA_ROOT,
                     runs_root=RUNS_ROOT,
                     enable_content_hashes=enable_hashes,
