@@ -496,6 +496,67 @@ def _resolve_token_dataset_snapshot(data_path: Path) -> Path | None:
     return candidate if candidate.exists() else None
 
 
+def _load_json_path(path: Path) -> dict | None:
+    if not path.exists() or not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _dataset_info_from_manifest(manifest: dict, manifest_path: Path | None = None) -> dict:
+    dataset_id = manifest.get("id")
+    if not dataset_id and manifest_path is not None:
+        dataset_id = manifest_path.parent.name
+    return {
+        "id": dataset_id,
+        "name": manifest.get("name"),
+        "snapshot_path": manifest.get("snapshot_path"),
+        "manifest_path": str(manifest_path) if manifest_path else None,
+    }
+
+
+def _find_dataset_manifest_by_snapshot(snapshot_path: str) -> dict | None:
+    if not snapshot_path or not DATASETS_DIR.exists():
+        return None
+    for run_dir in sorted(DATASETS_DIR.iterdir(), reverse=True):
+        if not run_dir.is_dir():
+            continue
+        manifest_path = run_dir / "dataset_manifest.json"
+        payload = _load_json_path(manifest_path)
+        if not payload:
+            continue
+        if payload.get("snapshot_path") == snapshot_path:
+            return _dataset_info_from_manifest(payload, manifest_path)
+    return None
+
+
+def _resolve_dataset_info_from_data_path(data_path: str | None) -> dict | None:
+    if not data_path:
+        return None
+    path = Path(str(data_path))
+    if path.is_dir():
+        manifest_path = path / "dataset_manifest.json"
+        manifest = _load_json_path(manifest_path)
+        if manifest:
+            return _dataset_info_from_manifest(manifest, manifest_path)
+        meta = _load_token_dataset_meta(path)
+        if meta:
+            snapshot_path = meta.get("snapshot_path")
+            if snapshot_path:
+                return _find_dataset_manifest_by_snapshot(str(snapshot_path)) or {
+                    "id": None,
+                    "name": None,
+                    "snapshot_path": str(snapshot_path),
+                    "manifest_path": None,
+                }
+    if path.exists():
+        return _find_dataset_manifest_by_snapshot(str(path))
+    return None
+
+
 def _ensure_token_dataset(
     dataset_manifest_path: Path,
     tokenizer_path: Path,
@@ -1153,6 +1214,11 @@ class Handler(BaseHTTPRequestHandler):
                     except json.JSONDecodeError:
                         manifest = None
                     payload["manifest"] = manifest
+                if isinstance(manifest, dict):
+                    data_path = manifest.get("inputs", {}).get("data") or manifest.get("inputs", {}).get("snapshot")
+                    dataset_info = _resolve_dataset_info_from_data_path(data_path)
+                    if dataset_info:
+                        payload["dataset"] = dataset_info
                 logs_path = run_path / "logs.jsonl"
                 if logs_path.exists():
                     payload["logs"] = logs_path.read_text(encoding="utf-8", errors="replace").splitlines()[-200:]

@@ -78,7 +78,7 @@ async function loadTokenizerVocabsCache() {
   return tokenizerVocabsCache;
 }
 
-async function updateRunHighlights(manifest, runDir) {
+async function updateRunHighlights(manifest, runDir, datasetInfo = null) {
   if (!els.runDatasetName || !els.runTokenizerName || !els.runTrainingConfigName) return;
   els.runDatasetName.textContent = '-';
   els.runTokenizerName.textContent = '-';
@@ -91,21 +91,25 @@ async function updateRunHighlights(manifest, runDir) {
   els.runTrainingConfigName.textContent = formatHighlight(trainingName);
 
   const dataPath = manifest.inputs?.data;
+  const resolvedDataPath = datasetInfo?.snapshot_path || dataPath;
   const tokenizerPath = manifest.inputs?.tokenizer;
-  const datasetId = extractRunId(dataPath, 'datasets');
+  const datasetId = extractRunId(resolvedDataPath, 'datasets');
   const tokenizerRunId = extractRunId(tokenizerPath, 'tokenizer');
 
-  if (dataPath) {
+  if (datasetInfo && (datasetInfo.name || datasetInfo.id)) {
+    const label = datasetInfo.name || datasetInfo.id;
+    els.runDatasetName.textContent = formatHighlight(label, `dataset ${datasetInfo.id || '-'}`);
+  } else if (resolvedDataPath) {
     const datasets = await loadDatasetsCache();
     if (guardRunDir && (!selectedRun || selectedRun.run_dir !== guardRunDir)) return;
-    const match = datasets.find((row) => row.snapshot_path === dataPath || row.id === datasetId);
+    const match = datasets.find((row) => row.snapshot_path === resolvedDataPath || row.id === datasetId);
     if (match) {
       const label = match.name || match.id;
       els.runDatasetName.textContent = formatHighlight(label, `dataset ${datasetId || '-'}`);
     } else if (datasetId) {
       els.runDatasetName.textContent = `dataset ${datasetId}`;
     } else {
-      els.runDatasetName.textContent = dataPath;
+      els.runDatasetName.textContent = resolvedDataPath;
     }
   }
 
@@ -568,7 +572,7 @@ async function showRunDetails(runDir) {
     els.runLoadStatus.textContent = 'Viewing run details.';
   }
   renderRunDetails(data.summary, data.manifest);
-  updateRunHighlights(data.manifest, data.summary?.run_dir);
+  updateRunHighlights(data.manifest, data.summary?.run_dir, data.dataset);
   if (selectedRun && selectedRun.stage === 'train') {
     seedRunLossLogs(data.logs || []);
   } else {
@@ -721,7 +725,7 @@ async function refreshSelectedRunDetails() {
     process_log: data.process_log || [],
   };
   renderRunDetails(data.summary, data.manifest);
-  updateRunHighlights(data.manifest, data.summary?.run_dir || selectedRun?.run_dir);
+  updateRunHighlights(data.manifest, data.summary?.run_dir || selectedRun?.run_dir, data.dataset);
   if (selectedRun.stage === 'train') {
     seedRunLossLogs(data.logs || []);
   } else {
